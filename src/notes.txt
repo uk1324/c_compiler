@@ -1,0 +1,12 @@
+https://www.tortall.net/projects/yasm/manual/html/nasm-immediate.html
+struct Operand
+{
+	union char* memoryLabel;
+	Register register;
+	int stackOffset;
+	// Maybe also add immediate so during compliation constant expressions like 2 + 2 can be evaluated
+};
+
+// Bitset
+https://stackoverflow.com/questions/29165588/c-nested-unions-and-structs
+// Custom printf for instructions taking in Result values
