@@ -10,3 +10,4 @@ struct Operand
 // Bitset
 https://stackoverflow.com/questions/29165588/c-nested-unions-and-structs
 // Custom printf for instructions taking in Result values
+http://www.egr.unlv.edu/~ed/assembly64.pdf

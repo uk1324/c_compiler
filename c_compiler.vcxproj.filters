@@ -91,4 +91,7 @@
     <Text Include="src\test.txt" />
     <Text Include="src\notes.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+  </ItemGroup>
 </Project>
