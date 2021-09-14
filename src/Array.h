@@ -6,8 +6,6 @@
 
 #define ARRAY_INITIAL_CAPACITY 4
 
-//#define GENERIC_FREE_NO_OP, 
-
 #define ARRAY_TEMPLATE_DECLARATION(arrayTypeName, itemType) \
 typedef struct \
 { \
@@ -23,7 +21,7 @@ void arrayTypeName##Append(arrayTypeName* array, itemType item);
 // void freeItemType(itemType* ptr)
 #define ARRAY_TEMPLATE_DEFINITION(arrayTypeName, itemType, copyItemType, freeItemType) \
 \
-static int growCapacity(size_t capacity) \
+static int grow##arrayTypeName##Capacity(size_t capacity) \
 { \
 	return capacity * 2; \
 } \
@@ -44,7 +42,7 @@ void arrayTypeName##Append(arrayTypeName* array, itemType item) \
 { \
 	if ((array->size + 1) > array->capacity) \
 	{ \
-		array->capacity = growCapacity(array->capacity); \
+		array->capacity = grow##arrayTypeName##Capacity(array->capacity); \
 		itemType* newData = malloc(array->capacity * sizeof(itemType)); \
 		if (newData == NULL) \
 		{ \

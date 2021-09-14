@@ -193,7 +193,7 @@ static Token number(Scanner* scanner)
 static TokenType matchKeyword(Scanner* scanner, size_t offset, size_t restLength, const char* rest, TokenType type)
 {
 	if (((scanner->tokenStart + offset + restLength) < scanner->dataEnd)
-	 && ((scanner->currentChar - scanner->tokenStart == (offset + restLength)))
+	 && (((size_t)(scanner->currentChar - scanner->tokenStart) == (offset + restLength)))
 	 && (memcmp(scanner->tokenStart + offset, rest, restLength) == 0))
 	{
 		return type;
@@ -210,36 +210,39 @@ static Token identifierOrKeyword(Scanner* scanner)
 
 	TokenType type = TOKEN_IDENTIFIER;
 
+	#define KEYWORD_GROUP(chr) \
+		case chr: 
+
+	#define KEYWORD_GROUP_END() \
+		break;
+
+	#define KEYWORD(keywordString, tokenType) \
+		{ \
+			ptrdiff_t keywordLength = sizeof(keywordString) - 1; \
+			if (((scanner->currentChar - scanner->tokenStart) == keywordLength) \
+			  && (memcmp(scanner->tokenStart, keywordString, keywordLength) == 0)) \
+			{ \
+				type = tokenType; \
+				break; \
+			} \
+		}
+
 	switch (scanner->tokenStart[0])
 	{
-		case 'i':
-		{
-			switch (scanner->tokenStart[1])
-			{
-				case 'f': type = matchKeyword(scanner, 2, 0, "", TOKEN_IF); break;
-				case 'n': type = matchKeyword(scanner, 2, 1, "t", TOKEN_INT); break;
-			}
-			break;
-		}
+		KEYWORD_GROUP('d')
+			KEYWORD("double", TOKEN_DOUBLE)
+			KEYWORD("do", TOKEN_DO)
+		KEYWORD_GROUP_END()
 
-		case 'd':
-		{
-			switch (scanner->tokenStart[1])
-			{
-				case 'o':
-				{
-					type = matchKeyword(scanner, 2, 0, "", TOKEN_DO);
-
-					switch (scanner->tokenStart[2])
-					{
-						case 'u': type = matchKeyword(scanner, 3, 3, "ble", TOKEN_DOUBLE); break;
-					}
-					break;
-				}
-			}
-			break;
-		}
+		KEYWORD_GROUP('i')
+			KEYWORD("if", TOKEN_IF)
+			KEYWORD("int", TOKEN_INT)
+		KEYWORD_GROUP_END()
 	}
+
+	#undef KEYWORD
+	#undef KEYWORD_GROUP
+	#undef KEYWORD_GROUP_END
 
 	return makeToken(scanner, type);
 }
@@ -274,6 +277,7 @@ static Token scanToken(Scanner* scanner)
 	advance(scanner);
 
 	// Maybe use a macro for makeToken
+	// Use ternary match for decrement increment
 	switch (chr)
 	{
 		case '+': return makeToken(scanner, TOKEN_PLUS);
@@ -282,6 +286,8 @@ static Token scanToken(Scanner* scanner)
 		case '/': return makeToken(scanner, TOKEN_SLASH);
 		case '(': return makeToken(scanner, TOKEN_LEFT_PAREN);
 		case ')': return makeToken(scanner, TOKEN_RIGHT_PAREN);
+		case ';': return makeToken(scanner, TOKEN_SEMICOLON);
+		case '=': return makeToken(scanner, TOKEN_EQUALS);
 			
 		default:
 			error(scanner, "invalid char");

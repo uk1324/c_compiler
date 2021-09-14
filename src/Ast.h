@@ -2,12 +2,15 @@
 
 #include "Scanner.h"
 
+// Should make more things const
+
 typedef enum
 {
 	EXPR_BINARY,
 	EXPR_UNARY,
 	EXPR_INT_LITERAL,
-	EXPR_GROUPING
+	EXPR_GROUPING,
+	EXPR_IDENTIFIER
 } ExprType;
 
 typedef struct
@@ -15,7 +18,7 @@ typedef struct
 	ExprType type;
 } Expr;
 
-void* ExprAllocate(size_t size, ExprType type);
+Expr* ExprAllocate(size_t size, ExprType type);
 void ExprFree(Expr* expression);
 
 typedef struct
@@ -40,9 +43,46 @@ typedef struct
 	Expr* expression;
 } ExprGrouping;
 
-// Maybe later split to array literal and number 
+typedef struct
+{
+	Expr expr;
+	Token name;
+} ExprIdentifier;
+
+// Maybe later add array literal and string
 typedef struct
 {
 	Expr expr;
 	Token literal;
 } ExprIntLiteral;
+
+typedef enum
+{
+	STMT_EXPRESSION,
+	STMT_VARIABLE_DECLARATION
+} StmtType;
+
+typedef struct
+{
+	StmtType type;
+} Stmt;
+
+ARRAY_TEMPLATE_DECLARATION(StmtArray, Stmt*)
+
+Stmt* StmtAllocate(size_t size, StmtType type);
+void StmtFree(Stmt* statement);
+
+typedef struct
+{
+	Stmt stmt;
+	Expr* expresssion;
+} StmtExpression;
+
+typedef struct
+{
+	Stmt stmt;
+	Token name;
+	Expr* initializer; // Can be NULL
+	// Later also add thing like is struct maybe
+	TokenType type;
+} StmtVariableDeclaration;

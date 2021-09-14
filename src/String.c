@@ -56,6 +56,15 @@ String StringFromFile(const char* filename)
 	return string;
 }
 
+String StringNonOwning(char* str)
+{
+	String string;
+	string.chars = str;
+	string.length = strlen(str);
+	string.capacity = 0;
+	return string;
+}
+
 static size_t growCapacity(size_t capacity)
 {
 	return capacity * 2;
@@ -114,6 +123,14 @@ void StringAppendFormat(String* string, const char* format, ...)
 	va_start(args, format);
 	StringAppendVaFormat(string, format, args);
 	va_end(args);
+}
+
+size_t StringHash(const String* string)
+{
+	size_t hash = 0;
+	for (char* chr = string->chars; chr < (string->chars + string->length); chr++)
+		hash = *chr + 31 * hash;
+	return hash;
 }
 
 void StringFree(String* string)

@@ -3,5 +3,9 @@
 #pragma once
 
 #include "Ast.h"
+#include "Assert.h"
 
-void printAst(Expr* expr);
+const char* TokenTypeToString(TokenType type);
+
+void printExpr(Expr* expr, int depth);
+void printStmt(Stmt* statement, int depth);

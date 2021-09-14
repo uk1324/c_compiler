@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -86,7 +86,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -100,7 +100,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
@@ -145,12 +145,16 @@
     <ClCompile Include="src\Cli.c" />
     <ClCompile Include="src\Compiler.c" />
     <ClCompile Include="src\IntArray.c" />
+    <ClCompile Include="src\Json.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\Parser.c" />
     <ClCompile Include="src\Scanner.c" />
     <ClCompile Include="src\String.c" />
+    <ClCompile Include="src\StringView.c" />
+    <ClCompile Include="src\Variable.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\Alignment.h" />
     <ClInclude Include="src\Array.h" />
     <ClInclude Include="src\Assert.h" />
     <ClInclude Include="src\Ast.h" />
@@ -158,12 +162,16 @@
     <ClInclude Include="src\Bitset.h" />
     <ClInclude Include="src\Cli.h" />
     <ClInclude Include="src\Compiler.h" />
+    <ClInclude Include="src\Generic.h" />
     <ClInclude Include="src\IntArray.h" />
+    <ClInclude Include="src\Json.h" />
     <ClInclude Include="src\Parser.h" />
     <ClInclude Include="src\Scanner.h" />
     <ClInclude Include="src\String.h" />
+    <ClInclude Include="src\StringView.h" />
     <ClInclude Include="src\Table.h" />
     <ClInclude Include="src\TerminalColors.h" />
+    <ClInclude Include="src\Variable.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="src\notes.txt" />

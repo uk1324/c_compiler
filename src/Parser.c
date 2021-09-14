@@ -6,6 +6,7 @@ void ParserInit(Parser* parser, Scanner* scanner)
 	parser->scanner = scanner;
 	parser->current = ScannerNextToken(scanner);
 	parser->hadError = false;
+	parser->isSynchronizing = false;
 }
 
 void ParserFree(Parser* parser)
@@ -13,31 +14,39 @@ void ParserFree(Parser* parser)
 
 }
 
-// Add fmt if needed later
+static void advance(Parser* parser);
+static bool isAtEnd(Parser* parser);
 
+static void synchornize(Parser* parser)
+{
+	parser->isSynchronizing = false;
+	while (isAtEnd(parser) == false)
+	{
+		advance(parser);
+		switch (parser->current.type)
+		{
+			case TOKEN_INT:
+			case TOKEN_SEMICOLON:
+				return;
+		}
+	}
+}
+
+// Add fmt if needed later
 static void errorAt(Parser* parser, Token* token, const char* message)
 {
+	if (parser->isSynchronizing)
+		return;
+	parser->hadError = true;
+	parser->isSynchronizing = true;
+
 	size_t line = (size_t)token->line;
 	IntArray* lineStartOffsets = &parser->scanner->lineStartOffsets;
-
-	int lineLength;
-
-	if (line == lineStartOffsets->size)
-	{
-		lineLength = parser->scanner->dataEnd - (parser->scanner->dataStart - lineStartOffsets->data[line - 1]);
-	}
-	else
-	{
-		lineLength = lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
-	}
-
-	//int lineLength = (line == lineStartOffsets->size)
-	//	? parser->scanner->dataEnd - lineStartOffsets->data[line - 1]
-	//	: lineStartOffsets->data[line - 1] - lineStartOffsets->data[line - 2];
+	int lineLength = (line == lineStartOffsets->size)
+		? parser->scanner->dataEnd - (parser->scanner->dataStart - lineStartOffsets->data[line - 1])
+		: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
 
 	int offsetInLine = (token->chars - parser->scanner->dataStart) - lineStartOffsets->data[line - 1];
-
-	printf("type: %d\n", token->type);
 
 	fprintf(
 		stderr,
@@ -69,7 +78,9 @@ static void advance(Parser* parser)
 	{
 		parser->previous = parser->current;
 		parser->current = ScannerNextToken(parser->scanner);
-		printf("token_t: %d\n", parser->current.type);
+
+		if (parser->current.type == TOKEN_ERROR)
+			parser->hadError = true;
 	}
 }
 
@@ -93,11 +104,11 @@ static bool match(Parser* parser, TokenType type)
 	return false;
 }
 
-static void consume(Parser* parser, TokenType type, const char* message)
+static void consume(Parser* parser, TokenType type, const char* errorMessage)
 {
 	if (match(parser, type) == false)
 	{
-		error(parser, message);
+		error(parser, errorMessage);
 	}
 }
 
@@ -107,23 +118,28 @@ static Expr* literal(Parser* parser)
 {
 	if (match(parser, TOKEN_NUMBER))
 	{
-		ExprIntLiteral* expr = ExprAllocate(sizeof(ExprIntLiteral), EXPR_INT_LITERAL);
+		ExprIntLiteral* expr = (ExprIntLiteral*)ExprAllocate(sizeof(ExprIntLiteral), EXPR_INT_LITERAL);
 		expr->literal = parser->previous;
 		
 		return (Expr*)expr;
 	}
-	else
+	else if (match(parser, TOKEN_IDENTIFIER))
 	{
-		// Don't know if this is a good message
-		error(parser, "Expected literal");
+		ExprIdentifier* expr = (ExprIdentifier*)ExprAllocate(sizeof(ExprIdentifier), EXPR_IDENTIFIER);
+		expr->name = parser->previous;
+		return (Expr*)expr;
 	}
+
+	// Don't know if this is a good message
+	error(parser, "Expected literal");
+	return NULL;
 }
 
 static Expr* grouping(Parser* parser)
 {
 	if (match(parser, TOKEN_LEFT_PAREN))
 	{
-		ExprGrouping* expr = ExprAllocate(sizeof(ExprGrouping), EXPR_GROUPING);
+		ExprGrouping* expr = (ExprGrouping*)ExprAllocate(sizeof(ExprGrouping), EXPR_GROUPING);
 		expr->expression = expression(parser);
 		consume(parser, TOKEN_RIGHT_PAREN, "expected ')' after expression");
 		return (Expr*)expr;
@@ -136,7 +152,7 @@ static Expr* unary(Parser* parser)
 {
 	if ((match(parser, TOKEN_PLUS)) || (match(parser, TOKEN_MINUS)))
 	{
-		ExprUnary* expr = ExprAllocate(sizeof(ExprUnary), EXPR_UNARY);
+		ExprUnary* expr = (ExprUnary*)ExprAllocate(sizeof(ExprUnary), EXPR_UNARY);
 		expr->operator = parser->previous.type;
 		expr->operand = expression(parser);
 		return (Expr*)expr;
@@ -152,7 +168,7 @@ static Expr* term(Parser* parser)
 
 	if ((match(parser, TOKEN_SLASH)) || (match(parser, TOKEN_ASTERISK)) || (match(parser, TOKEN_PERCENT)))
 	{
-		ExprBinary* expr = ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		ExprBinary* expr = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
 		expr->left = left;
 		expr->operator = parser->previous.type;
 		expr->right = term(parser);
@@ -168,7 +184,7 @@ static Expr* factor(Parser* parser)
 
 	if ((match(parser, TOKEN_PLUS)) || (match(parser, TOKEN_MINUS)))
 	{
-		ExprBinary* expr = ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		ExprBinary* expr = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
 		expr->left = left;
 		expr->operator = parser->previous.type;
 		expr->right = factor(parser);
@@ -183,7 +199,57 @@ static Expr* expression(Parser* parser)
 	return factor(parser);
 }
 
-Expr* ParserParse(Parser* parser)
+//static StmtList* 
+
+static Stmt* expressionStatement(Parser* parser)
 {
-	return expression(parser);
+	StmtExpression* expressionStmt = (StmtExpression*)StmtAllocate(sizeof(StmtExpression), STMT_EXPRESSION);
+	expressionStmt->expresssion = expression(parser);
+	consume(parser, TOKEN_SEMICOLON, "expected ';'");
+	return (Stmt*)expressionStmt;
+}
+
+// Later add support for multiple variables
+// Don't know if it possible to compile that into multiple statment or just put all in one
+static Stmt* variableDeclaration(Parser* parser)
+{
+	StmtVariableDeclaration* variableDeclaration = (StmtVariableDeclaration*)StmtAllocate(sizeof(StmtVariableDeclaration), STMT_VARIABLE_DECLARATION);
+	variableDeclaration->type = parser->previous.type;
+	consume(parser, TOKEN_IDENTIFIER, "Expected variable name");
+	variableDeclaration->name = parser->previous;
+	if (match(parser, TOKEN_EQUALS))
+	{
+		variableDeclaration->initializer = expression(parser);
+	}
+	else
+	{
+		variableDeclaration->initializer = NULL;
+	}
+
+	consume(parser, TOKEN_SEMICOLON, "expected ';'");
+
+	return (Stmt*)variableDeclaration;
+}
+
+static Stmt* statement(Parser* parser)
+{
+	if (match(parser, TOKEN_INT))
+		return variableDeclaration(parser);
+	else
+		return expressionStatement(parser);
+}
+
+StmtArray ParserParse(Parser* parser)
+{
+	StmtArray array;
+	StmtArrayInit(&array);
+	while (isAtEnd(parser) == false)
+	{
+		StmtArrayAppend(&array, statement(parser));
+
+		if (parser->isSynchronizing)
+			synchornize(parser);
+	}
+
+	return array;
 }

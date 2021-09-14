@@ -1,7 +1,7 @@
 #pragma once
 
 // Disable fopen_s warnings
-#define _CRT_SECURE_NO_WARNINGS
+//#define _CRT_SECURE_NO_WARNINGS
 
 #include <stddef.h>
 
@@ -16,9 +16,11 @@ typedef struct
 
 String StringCopy(const char* string);
 String StringFromFile(const char* filename);
+String StringNonOwning(char* str);
 void StringAppendVaFormat(String* string, const char* format, va_list arguments);
 void StringAppendFormat(String* string, const char* format, ...);
-// Maybe make a non owning string in append so both string and constchar* can be appended
+size_t StringHash(const String* string);
+
 void StringAppend(String* string, const char* str);
 void StringAppendLen(String* string, const char* str, size_t length);
 void StringFree(String* string);

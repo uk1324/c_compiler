@@ -13,6 +13,8 @@ typedef enum
 	TOKEN_ASTERISK,
 	TOKEN_SLASH,
 	TOKEN_PERCENT,
+	TOKEN_SEMICOLON,
+	TOKEN_EQUALS,
 
 	TOKEN_LEFT_PAREN,
 	TOKEN_RIGHT_PAREN,
@@ -28,6 +30,7 @@ typedef enum
 	TOKEN_DO
 }  TokenType;
 
+// Use StringView
 typedef struct
 {
 	TokenType type;
@@ -36,6 +39,7 @@ typedef struct
 	int line;
 } Token;
 
+// Maybe split this to a struct FileInformation that will contain filename and line information
 typedef struct
 {
 	int line;

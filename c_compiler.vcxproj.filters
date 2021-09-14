@@ -45,6 +45,15 @@
     <ClCompile Include="src\Compiler.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\Variable.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\StringView.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Json.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Scanner.h">
@@ -86,10 +95,25 @@
     <ClInclude Include="src\Compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Alignment.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Variable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Generic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\StringView.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Json.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="src\test.txt" />
     <Text Include="src\notes.txt" />
+    <Text Include="src\test.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

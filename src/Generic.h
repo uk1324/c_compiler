@@ -1,0 +1,1 @@
+#define NO_OP_FUNCTION (void(*))

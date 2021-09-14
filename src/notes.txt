@@ -11,3 +11,17 @@ struct Operand
 https://stackoverflow.com/questions/29165588/c-nested-unions-and-structs
 // Custom printf for instructions taking in Result values
 http://www.egr.unlv.edu/~ed/assembly64.pdf
+
+Register allocation
+Should some registers not be allocated because of function calls or instructions like mul https://www.felixcloutier.com/x86/mul
+Which registers should be allocated first
+System V ABI uses [rdi, rsi, rdx, rcx, r8, r9] for parameters
+[rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11] are scratch registers (caller saved)
+[rbx, rsp, rbp, r12, r13, r14, r15] are preserved (calle saved)
+[rax, rdx] store the return value
+xmm0 - xmm7 are used for floating point
+
+Ast function can have isLeaf that will be set during semnatic analysis
+Leaf function don't need to allocate on the stack the top of the stack for themselves
+
+Stack has to be aligned to 128 bits on function call for simd instructions
