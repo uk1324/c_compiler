@@ -11,6 +11,7 @@ static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 	va_start(args, format);
 	vfprintf(stderr, format, args);
 	va_end(args);
+	printf("\n");
 }
 
 static int resetRegisterAllocationBitset(Compiler* compiler)

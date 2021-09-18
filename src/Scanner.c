@@ -170,7 +170,7 @@ static bool isAlpha(char chr)
 {
 	return ((chr >= 'A') && (chr <= 'Z'))
 		|| ((chr >= 'a') && (chr <= 'z'))
-		|| (chr == '_');
+		||  (chr == '_');
 }
 
 static bool isDigit(char chr)
