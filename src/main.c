@@ -66,7 +66,7 @@ int main(int argc, char* argv)
 
 	Compiler compiler;
 	//CompilerInit(&compiler);
-	CompilerCompile(&compiler, &ast);
+	CompilerCompile(&compiler, &parser, &ast);
 	
 
 	StringFree(&source);

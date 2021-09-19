@@ -29,12 +29,13 @@ static void setStringViewNull(StringView* view)
 
 TABLE_TEMPLATE_DEFINITION(LocalVariableTable, StringView, LocalVariable, StringViewHash, copyStringView, compareStringView, NO_OP_FUNCTION, copyLocalVariable, NO_OP_FUNCTION, isStringViewNull, setStringViewNull)
 
-size_t VariableTypeSize(VariableType type)
+size_t DataTypeSize(DataType type)
 {
-	switch (type)
+	// Add if for struct
+	switch (type.type)
 	{
-		case VARIABLE_INT: return 4;
-		case VARIABLE_SHORT: return 2;
+		case DATA_TYPE_INT: return 4;
+		case DATA_TYPE_SHORT: return 2;
 
 	    default:
 		    ASSERT_NOT_REACHED();

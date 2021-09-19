@@ -39,6 +39,13 @@ void ExprFree(Expr* expression)
 			free(expression);
 			break;
 			
+		case EXPR_IDENTIFIER:
+			break;
+
+		case EXPR_GROUPING:
+			ExprFree(((ExprGrouping*)expression)->expression);
+			break;
+
 		default:
 			ASSERT_NOT_REACHED();
 			break;

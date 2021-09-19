@@ -30,13 +30,17 @@ typedef enum
 	RESULT_REGISTER,
 	RESULT_BASE_OFFSET,
 	RESULT_LABEL,
-	RESULT_IMMEDIATE
+	RESULT_IMMEDIATE,
+	// Find a better name
+	RESULT_FLAGS,
 } ResultType;
 
 
 typedef struct
 {
-	ResultType type;
+	// Find a better name
+	ResultType locationType;
+	DataType type;
 	// Add isSigned or usigned
 	// and Result size
 	// result type can contain the size of the value but that might be confusing
@@ -49,7 +53,7 @@ typedef struct
 		// Don't know if I should use int here
 		int intImmediate;
 		double floatImmediate;
-	} value;
+	} location;
 } Result;
 
 typedef struct

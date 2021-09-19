@@ -9,15 +9,29 @@
 
 typedef enum
 {
-	VARIABLE_INT,
-	VARIABLE_SHORT,
-} VariableType;
-
-size_t VariableTypeSize(VariableType type);
+	DATA_TYPE_INT,
+	DATA_TYPE_SHORT,
+	DATA_TYPE_LONG_DOUBLE,
+	DATA_TYPE_DOUBLE,
+	DATA_TYPE_FLOAT
+} DataTypeType;
 
 typedef struct
 {
-	VariableType type;
+	DataTypeType type;
+
+	bool isUnsigned;
+	//union
+	//{
+	//	StructType* struct;
+	//} as;
+} DataType;
+
+size_t DataTypeSize(DataType type);
+
+typedef struct
+{
+	DataType type;
 
 	size_t baseOffset;
 	
@@ -32,14 +46,14 @@ typedef struct
 
 typedef struct
 {
-	VariableType type;
+	DataType type;
 	// Real offset is bp[-baseOffset]
 	size_t baseOffset;
 } LocalVariable;
 
 typedef struct
 {
-	VariableType type;
+	DataType type;
 	int labelIndex;
 } GlobalVariable;
 

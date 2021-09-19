@@ -7,10 +7,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-//#define _CRT_SECURE_NO_WARNINGS
 // #ifdef moveItemType move #else copyItemType
 // hashKeyType, compareKeyType, copyKeyType, copyItemType, freeKeyType freeItemType
-// Generic.h NO_OP_FUN
 // mark things const also in array
 
 #define TABLE_INITIAL_CAPACITY 16

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Scanner.h"
 #include "Ast.h"
 

@@ -1,5 +1,6 @@
 #include "Parser.h"
 #include "TerminalColors.h" 
+#include "Variable.h"
 
 void ParserInit(Parser* parser, Scanner* scanner)
 {
@@ -112,6 +113,19 @@ static void consume(Parser* parser, TokenType type, const char* errorMessage)
 	}
 }
 
+static DataType dataType(Parser* parser)
+{
+	DataType type;
+
+	if (match(parser, TOKEN_INT))
+	{
+		type.type = DATA_TYPE_INT;
+		type.isUnsigned = false;
+	}
+
+	return type;
+}
+
 static Expr* expression(Parser* parser);
 
 static Expr* literal(Parser* parser)
@@ -214,7 +228,7 @@ static Stmt* expressionStatement(Parser* parser)
 static Stmt* variableDeclaration(Parser* parser)
 {
 	StmtVariableDeclaration* variableDeclaration = (StmtVariableDeclaration*)StmtAllocate(sizeof(StmtVariableDeclaration), STMT_VARIABLE_DECLARATION);
-	variableDeclaration->type = parser->previous.type;
+	variableDeclaration->type = dataType(parser);
 	consume(parser, TOKEN_IDENTIFIER, "Expected variable name");
 	variableDeclaration->name = parser->previous;
 	if (match(parser, TOKEN_EQUALS))
@@ -233,7 +247,7 @@ static Stmt* variableDeclaration(Parser* parser)
 
 static Stmt* statement(Parser* parser)
 {
-	if (match(parser, TOKEN_INT))
+	if (check(parser, TOKEN_INT))
 		return variableDeclaration(parser);
 	else
 		return expressionStatement(parser);

@@ -1,1 +1,8 @@
-int x = 5;
+int x = 1;
+int y = 2;
+int z = 3;
+int a = 4;
+int b = 5;
+// a + x + y + z + b + 6;
+//a + b + c;
+(x + y) + ((a + b) + (z + x));

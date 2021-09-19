@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Scanner.h"
+#include "Variable.h"
 
 // Should make more things const
 
@@ -84,5 +85,5 @@ typedef struct
 	Token name;
 	Expr* initializer; // Can be NULL
 	// Later also add thing like is struct maybe
-	TokenType type;
+	DataType type;
 } StmtVariableDeclaration;
