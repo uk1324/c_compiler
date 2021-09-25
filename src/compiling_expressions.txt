@@ -1,0 +1,27 @@
+To compile an expression like this (a < b) * (a + b)
+First you need to evalute the types without acutally compiling it then you would need to check
+if a binary expression contains a conditional then then the order of different orders of evalutation might be better for different operators
+in this case there is no need to evaluate the second part (a + b) if (a < b) evaluates to 0 then it could compile to
+	cmp a, b
+	jge zero
+evaluate:
+	mov r0, a
+	add r0, b
+	jmp done
+zero:
+	xor r0, r0
+done:
+	
+but if it was addition 
+evaluate:
+	mov r0, a
+	add r0, b
+	cmp a, b
+	jge done
+	inc r0
+	done:
+// Could use set to avoid branching
+
+
+It would be really difficult to generate the code not knowing if the logical expression is going to be used in an arithmetic
+so I think I will just always move the result of cmp to a register

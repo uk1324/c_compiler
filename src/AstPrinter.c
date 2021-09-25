@@ -147,31 +147,40 @@ void printExpr(Expr* expression, int depth)
 		case EXPR_BINARY:
 		{
 			ExprBinary* expr = (ExprBinary*)expression;
-			printObjectStart(depth);
-			printKey("left", depth + 1);
-			printExpr(expr->left, depth + 1);
-			printMember(depth, "operator", TokenTypeToString(expr->operator));
-			printKey("right", depth + 1);
-			printExpr(expr->right, depth + 1);
-			printObjectEnd(depth);
+			printf("(");
+			printExpr(expr->left, depth);
+			printTokenType(expr->operator);
+			printExpr(expr->right, depth);
+			printf(")");
+			//printObjectStart(depth);
+			//printKey("left", depth + 1);
+			//printExpr(expr->left, depth + 1);
+			//printMember(depth, "operator", TokenTypeToString(expr->operator));
+			//printKey("right", depth + 1);
+			//printExpr(expr->right, depth + 1);
+			//printObjectEnd(depth);
 			break;
 		}
+
+		//case EXPR_IDENTIFIER;
 
 		case EXPR_INT_LITERAL:
 		{
 			ExprIntLiteral* expr = (ExprIntLiteral*)expression;
 			printf("%.*s", expr->literal.length, expr->literal.chars);
-			printMemberSeparator();
+			//printMemberSeparator();
 			break;
 		}
 
 		case EXPR_UNARY:
 		{
 			ExprUnary* expr = (ExprUnary*)expression;
-			printObjectStart(depth);
+			printTokenType(expr->operator);
+			printExpr(expr->operand, 0);
+			/*printObjectStart(depth);
 			printTokenType(expr->operator);
 			printExpr(expr->operand, depth + 1);
-			printObjectEnd(depth);
+			printObjectEnd(depth);*/
 			break;
 		}
 

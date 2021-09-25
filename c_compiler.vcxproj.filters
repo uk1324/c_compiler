@@ -39,9 +39,6 @@
     <ClCompile Include="src\AstPrinter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Bitset.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Compiler.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -52,6 +49,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Json.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Registers.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -89,9 +89,6 @@
     <ClInclude Include="src\Table.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Bitset.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -110,10 +107,14 @@
     <ClInclude Include="src\Json.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\Registers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="src\notes.txt" />
     <Text Include="src\test.txt" />
+    <Text Include="src\compiling_expressions.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

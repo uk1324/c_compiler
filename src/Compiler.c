@@ -1,6 +1,7 @@
 #include "Compiler.h"
 #include "Assert.h"
 #include "Alignment.h"
+#include "Registers.h"
 
 #include <stdarg.h>
 
@@ -13,15 +14,15 @@ static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 	printf("\n");
 }
 
-static int resetRegisterAllocationBitset(Compiler* compiler)
+static void freeGpRegisters(Compiler* compiler)
 {
-	for (int i = 0; i < REGISTER_COUNT; i++)
+	for (int i = 0; i < REGISTER_GP_COUNT; i++)
 	{
-		compiler->isRegisterAllocated.array[i] = false;
+		compiler->isRegisterGpAllocated.as.array[i] = false;
 	}
 
-	compiler->isRegisterAllocated.rsp = true;
-	compiler->isRegisterAllocated.rbp = true;
+	compiler->isRegisterGpAllocated.as.reg.rsp = true;
+	compiler->isRegisterGpAllocated.as.reg.rbp = true;
 }
 
 static int allocateRegister(Compiler* compiler)
@@ -29,9 +30,9 @@ static int allocateRegister(Compiler* compiler)
 	//for (int i = 0; i < REGISTER_COUNT; i++)
 	for (int i = 0; i < 3; i++)
 	{
-		if (compiler->isRegisterAllocated.array[i] == false)
+		if (compiler->isRegisterGpAllocated.as.array[i] == false)
 		{
-			compiler->isRegisterAllocated.array[i] = true;
+			compiler->isRegisterGpAllocated.as.array[i] = true;
 			return i;
 		}
 	}
@@ -42,46 +43,7 @@ static int allocateRegister(Compiler* compiler)
 static void freeRegister(Compiler* compiler, int index)
 {
 	// Could assert here
-	compiler->isRegisterAllocated.array[index] = false;
-}
-
-static const char* registerIndexToString(Register index, size_t registerSize)
-{
-	static const char* qwordRegisters[] = {
-		"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp",
-		"r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15",
-	};
-
-	static const char* dwordRegisters[] = {
-		"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp",
-		"r8d",  "r9d",  "r10d", "r11d", "r12d", "r13d", "r14d", "r15d",
-	};
-
-	static const char* wordRegisters[] = {
-		"ax", "bx", "cx", "dx", "si", "di", "bp", "sp",
-		"r8w",  "r9w",  "r10w", "r11w", "r12w", "r13w", "r14w", "r15w",
-	};
-
-	static const char* byteRegisters[] = {
-		"al", "bl", "cl", "dl", "sil", "dil", "bpl", "spl",
-		"r8b",  "r9b",  "r10b", "r11b", "r12b", "r13b", "r14b", "r15b",
-	};
-
-	ASSERT(index < (sizeof(qwordRegisters) / sizeof(qwordRegisters[0])));
-
-	switch (registerSize)
-	{
-		case 8: return qwordRegisters[index];
-		case 4: return dwordRegisters[index];
-		case 2: return wordRegisters[index];
-		case 1: return byteRegisters[index];
-
-		default:
-			ASSERT_NOT_REACHED();
-			break;
-	}
-
-	return NULL;
+	compiler->isRegisterGpAllocated.as.array[index] = false;
 }
 
 const char* dataSizeToString(size_t size)
@@ -124,7 +86,7 @@ static void emitResultLocation(Compiler* compiler, Result result)
 			break;
 
 		case RESULT_REGISTER:
-			StringAppendFormat(&compiler->output, " %s", registerIndexToString(result.location.reg, DataTypeSize(result.type)));
+			StringAppendFormat(&compiler->output, " %s", RegisterGpToString(result.location.reg, DataTypeSize(result.type)));
 			break;
 
 			// chnage later // wont work with bigger immediates
@@ -199,7 +161,7 @@ static Result moveToRegister(Compiler* compiler, Result value, bool* failedToAll
 		*failedToAllocate = false;
 	}
 
-	emitInstruction(compiler, "mov %s,", registerIndexToString(result.location.reg, DataTypeSize(value.type)));
+	emitInstruction(compiler, "mov %s,", RegisterGpToString(result.location.reg, DataTypeSize(value.type)));
 	emitResultLocation(compiler, value);
 	return result;
 }
@@ -335,8 +297,12 @@ static Result compileExprIdentifier(Compiler* compiler, ExprIdentifier* expr)
 	return result;
 }
 
+#include "AstPrinter.h"
+
 static Result compileExpr(Compiler* compiler, Expr* expr)
 {
+	printExpr(expr, 0);
+	puts("");
 	switch (expr->type)
 	{
 		case EXPR_BINARY: return compileExprBinary(compiler, (ExprBinary*)expr); 
@@ -400,7 +366,7 @@ void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast)
 	compiler->parser = parser;
 	compiler->output = StringCopy("");
 	compiler->stackAllocationSize = 0;
-	resetRegisterAllocationBitset(compiler);
+	freeGpRegisters(compiler);
 
 	for (size_t i = 0; i < ast->size; i++)
 	{

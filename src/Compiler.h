@@ -74,9 +74,9 @@ typedef struct
 			{
 				bool rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
 					 r8,  r9,  r10, r11, r12, r13, r14, r15;
-			};
-		};
-	} isRegisterAllocated;
+			} reg;
+		} as;
+	} isRegisterGpAllocated;
 
 	// Later add scopes maybe store the current scope source so at the end of the scope the stack space is known
 	LocalVariableTable locals;
