@@ -27,7 +27,7 @@ static int resetRegisterAllocationBitset(Compiler* compiler)
 static int allocateRegister(Compiler* compiler)
 {
 	//for (int i = 0; i < REGISTER_COUNT; i++)
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < REGISTER_COUNT; i++)
 	{
 		if (compiler->isRegisterAllocated.array[i] == false)
 		{
@@ -110,9 +110,12 @@ static void emitInstruction(Compiler* compiler, const char* format, ...)
 	va_end(args);
 }
 
-static void emitText(Compiler* compiler, const char* text)
+static void emitText(Compiler* compiler, const char* format, ...)
 {
-	StringAppend(&compiler->output, text);
+	va_list args;
+	va_start(args, format);
+	StringAppendVaFormat(&compiler->output, format, args);
+	va_end(args);
 }
 
 static void emitResultLocation(Compiler* compiler, Result result)
@@ -151,7 +154,8 @@ static Result compileExprIntLiteral(Compiler* compiler, ExprIntLiteral* expr)
 	result.locationType = RESULT_IMMEDIATE;
 	// Maybe put a switch statement here later
 	result.location.intImmediate = strtol(expr->literal.chars, NULL, 10);
-	DataType type;
+	//DataType type;
+	
 	result.type.type = DATA_TYPE_INT;
 	result.type.isUnsigned = false;
 	return result;
@@ -182,26 +186,30 @@ static bool isResultLocationImmediate(ResultType locationType)
 
 // What to do if register allocation failure
 // Could return a memory location but there are problems with stack alignment
-static Result moveToRegister(Compiler* compiler, Result value, bool* failedToAllocate)
+static bool moveToRegister(Compiler* compiler, Result value, Result* result)
 {
-	Result result;
-	result.type = value.type;
-	result.locationType = RESULT_REGISTER;
-	result.location.reg = allocateRegister(compiler);
+	Register reg = allocateRegister(compiler);
 
-	if (result.location.reg == -1)
-	{
-		*failedToAllocate = true;
-		return result;
-	}
-	else
-	{
-		*failedToAllocate = false;
-	}
+	if (reg == -1)
+		return false;
 
-	emitInstruction(compiler, "mov %s,", registerIndexToString(result.location.reg, DataTypeSize(value.type)));
+	result->locationType = RESULT_REGISTER;
+	result->location.reg = reg;
+
+	emitInstruction(compiler, "mov %s,", registerIndexToString(result->location.reg, DataTypeSize(value.type)));
 	emitResultLocation(compiler, value);
-	return result;
+
+	return true;
+}
+
+Result allocateTemp(Compiler* compiler)
+{
+	Result temp;
+	// Don't know the size of temp so just use QWORD
+	temp.location.baseOffset = allocateOnStack(compiler, 8);
+	temp.locationType = RESULT_BASE_OFFSET;
+	temp.type.type = DATA_TYPE_LONG;
+	return temp;
 }
 
 // Requires types to already be converted
@@ -222,42 +230,76 @@ static Result compileAddition(Compiler* compiler, Result lhs, Result rhs)
 		return result;
 	}
 
-	bool isLhsMemoryLocation = isResultLocationMemory(lhs.locationType);
-	bool isRhsMemoryLocation = isResultLocationMemory(rhs.locationType);
-
 	Register savedRegisterLhs = -1;
-	Result tempLocationLhs;
+	Result tempLocationLhs = {1, 1, 1};
 	Register savedRegisterRhs = -1;
-	Result tempLocationRhs;
+	Result tempLocationRhs = { 1, 1, 1 };
 
-	if (isLhsMemoryLocation)
+	if (lhs.locationType != RESULT_REGISTER)
 	{
-		bool failedToAllocate;
-		lhs = moveToRegister(compiler, lhs, &failedToAllocate);
-		if (failedToAllocate)
+		if (moveToRegister(compiler, lhs, &lhs) == false)
 		{
+			savedRegisterLhs = 0;
+			tempLocationLhs = allocateTemp(compiler);
+			emitInstruction(compiler, "mov");
+			emitResultLocation(compiler, tempLocationLhs);
+			emitText(compiler, ", %s", registerIndexToString(savedRegisterLhs, 8));
+
+			emitInstruction(compiler, "mov %s,", registerIndexToString(savedRegisterLhs, DataTypeSize(lhs.type)));
+			emitResultLocation(compiler, lhs);
 			
+			lhs.locationType = RESULT_REGISTER;
+			lhs.location.reg = savedRegisterLhs;
 		}
 	}
-	if (isRhsMemoryLocation)
+	if (rhs.locationType != RESULT_REGISTER)
 	{
-		bool failedToAllocate;
-		rhs = moveToRegister(compiler, rhs, &failedToAllocate);
-		if (failedToAllocate)
+		if (moveToRegister(compiler, rhs, &rhs) == false)
 		{
+			for (int i = 0; i < REGISTER_COUNT; i++)
+			{
+				if (i != savedRegisterLhs)
+				{
+					savedRegisterRhs = i;
+					break;
+				}
+			}
+			tempLocationRhs = allocateTemp(compiler);
+			emitInstruction(compiler, "mov");
+			emitResultLocation(compiler, tempLocationRhs);
+			emitText(compiler, ", %s", registerIndexToString(savedRegisterRhs, 8));
+
+			emitInstruction(compiler, "mov %s,", registerIndexToString(savedRegisterRhs, DataTypeSize(rhs.type)));
+			emitResultLocation(compiler, rhs);
+
+			rhs.locationType = RESULT_REGISTER;
+			rhs.location.reg = savedRegisterRhs;
 		}
 	}
 
 	emitInstruction(compiler, "add");
 	emitResultLocation(compiler, lhs);
-	emitText(compiler, ",");
+	emitText(compiler, "%s", ",");
 	emitResultLocation(compiler, rhs);
-	if (rhs.locationType == RESULT_REGISTER)
+	if (rhs.locationType == RESULT_REGISTER && savedRegisterRhs == -1)
 		freeRegister(compiler, rhs.location.reg);
 
 	if (savedRegisterLhs != -1)
 	{
-		
+		Result resultTemp = allocateTemp(compiler);
+		emitInstruction(compiler, "mov", registerIndexToString(savedRegisterLhs, 8));
+		emitResultLocation(compiler, resultTemp);
+		emitText(compiler, ", %s", registerIndexToString(savedRegisterLhs, 8));
+
+		emitInstruction(compiler, "mov %s,", registerIndexToString(savedRegisterLhs, 8));
+		emitResultLocation(compiler, tempLocationLhs);
+		lhs.locationType = RESULT_BASE_OFFSET;
+	}
+
+	if (savedRegisterRhs != -1)
+	{
+		emitInstruction(compiler, "mov %s,", registerIndexToString(savedRegisterRhs, 8));
+		emitResultLocation(compiler, tempLocationRhs);
 	}
 
 	return lhs;

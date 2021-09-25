@@ -21,7 +21,8 @@
 
 // Annymous structs and unions are C11
 
-#define REGISTER_COUNT 16
+//#define REGISTER_COUNT 16
+#define REGISTER_COUNT 3
 
 typedef int Register;
 

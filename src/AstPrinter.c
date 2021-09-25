@@ -147,13 +147,18 @@ void printExpr(Expr* expression, int depth)
 		case EXPR_BINARY:
 		{
 			ExprBinary* expr = (ExprBinary*)expression;
-			printObjectStart(depth);
+			printf("(");
+			printExpr(expr->left, 0);
+			printTokenType(expr->operator);
+			printExpr(expr->right, 0);
+			printf(")");
+			/*printObjectStart(depth);
 			printKey("left", depth + 1);
 			printExpr(expr->left, depth + 1);
 			printMember(depth, "operator", TokenTypeToString(expr->operator));
 			printKey("right", depth + 1);
 			printExpr(expr->right, depth + 1);
-			printObjectEnd(depth);
+			printObjectEnd(depth);*/
 			break;
 		}
 
@@ -161,17 +166,19 @@ void printExpr(Expr* expression, int depth)
 		{
 			ExprIntLiteral* expr = (ExprIntLiteral*)expression;
 			printf("%.*s", expr->literal.length, expr->literal.chars);
-			printMemberSeparator();
+			//printMemberSeparator();
 			break;
 		}
 
 		case EXPR_UNARY:
 		{
 			ExprUnary* expr = (ExprUnary*)expression;
-			printObjectStart(depth);
+			printTokenType(expr->operator);
+			printExpr(expr->operand, 0);
+			/*printObjectStart(depth);
 			printTokenType(expr->operator);
 			printExpr(expr->operand, depth + 1);
-			printObjectEnd(depth);
+			printObjectEnd(depth);*/
 			break;
 		}
 
@@ -181,6 +188,13 @@ void printExpr(Expr* expression, int depth)
 			printf("(");
 			printExpr(expr->expression, depth + 1);
 			printf(")");
+			break;
+		}
+
+		case EXPR_IDENTIFIER:
+		{
+			ExprIdentifier* expr = (ExprIdentifier*)expression;
+			printf("%.*s", expr->name.length, expr->name.chars);
 			break;
 		}
 
