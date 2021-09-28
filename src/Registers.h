@@ -10,6 +10,8 @@
 #define SIZE_WORD 2
 #define SIZE_BYTE 1
 
+#define REGISTER_ERROR -1
+
 // General purpose registers
 typedef enum
 {
@@ -29,7 +31,6 @@ typedef enum
 	REGISTER_R13,
 	REGISTER_R14,
 	REGISTER_R15,
-	REGISTER_ERROR = -1
 } RegisterGp;
 
 typedef enum

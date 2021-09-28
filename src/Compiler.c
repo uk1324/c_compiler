@@ -1,7 +1,6 @@
 #include "Compiler.h"
 #include "Assert.h"
 #include "Alignment.h"
-#include "Registers.h"
 
 #include <stdarg.h>
 
@@ -14,6 +13,13 @@ static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 	printf("\n");
 }
 
+
+static void freeGpRegister(Compiler* compiler, RegisterGp reg)
+{
+	ASSERT((size_t)reg < REGISTER_GP_COUNT);
+	compiler->isRegisterGpAllocated.as.array[reg] = false;
+}
+
 static void freeGpRegisters(Compiler* compiler)
 {
 	for (int i = 0; i < REGISTER_GP_COUNT; i++)
@@ -21,14 +27,13 @@ static void freeGpRegisters(Compiler* compiler)
 		compiler->isRegisterGpAllocated.as.array[i] = false;
 	}
 
-	compiler->isRegisterGpAllocated.as.reg.rsp = true;
-	compiler->isRegisterGpAllocated.as.reg.rbp = true;
+	compiler->isRegisterGpAllocated.as.registerGp.rsp = true;
+	compiler->isRegisterGpAllocated.as.registerGp.rbp = true;
 }
 
-static int allocateRegister(Compiler* compiler)
+static RegisterGp allocateGpRegister(Compiler* compiler)
 {
-	//for (int i = 0; i < REGISTER_COUNT; i++)
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < REGISTER_GP_COUNT; i++)
 	{
 		if (compiler->isRegisterGpAllocated.as.array[i] == false)
 		{
@@ -37,30 +42,22 @@ static int allocateRegister(Compiler* compiler)
 		}
 	}
 
-	return -1;
-}
-
-static void freeRegister(Compiler* compiler, int index)
-{
-	// Could assert here
-	compiler->isRegisterGpAllocated.as.array[index] = false;
+	return REGISTER_ERROR;
 }
 
 const char* dataSizeToString(size_t size)
 {
 	switch (size)
 	{
-		case 8: return "QWORD";
-		case 4: return "DWORD";
-		case 2: return "WORD";
-		case 1: return "BYTE";
+		case SIZE_QWORD: return "QWORD";
+		case SIZE_DWORD: return "DWORD";
+		case SIZE_WORD:  return "WORD";
+		case SIZE_BYTE:  return "BYTE";
 
 		default:
 			ASSERT_NOT_REACHED();
-			break;
+			return NULL;
 	}
-
-	return NULL;
 }
 
 static void emitInstruction(Compiler* compiler, const char* format, ...)
@@ -72,29 +69,32 @@ static void emitInstruction(Compiler* compiler, const char* format, ...)
 	va_end(args);
 }
 
-static void emitText(Compiler* compiler, const char* text)
+static void emitText(Compiler* compiler, const char* format, ...)
 {
-	StringAppend(&compiler->output, text);
+	va_list args;
+	va_start(args, format);
+	StringAppendVaFormat(&compiler->output, format, args);
+	va_end(args);
 }
 
 static void emitResultLocation(Compiler* compiler, Result result)
 {
 	switch (result.locationType)
 	{
-		case RESULT_BASE_OFFSET:
-			StringAppendFormat(&compiler->output, " %s [rbp-%u]", dataSizeToString(DataTypeSize(result.type)), result.location.baseOffset);
+		case RESULT_LOCATION_BASE_OFFSET:
+			StringAppendFormat(&compiler->output, " %s [rbp-%u]", dataSizeToString(DataTypeSize(result.dataType)), result.location.baseOffset);
 			break;
 
-		case RESULT_REGISTER:
-			StringAppendFormat(&compiler->output, " %s", RegisterGpToString(result.location.reg, DataTypeSize(result.type)));
+		case RESULT_LOCATION_REGISTER_GP:
+			StringAppendFormat(&compiler->output, " %s", RegisterGpToString(result.location.registerGp, DataTypeSize(result.dataType)));
 			break;
 
 			// chnage later // wont work with bigger immediates
-		case RESULT_IMMEDIATE:
+		case RESULT_LOCATION_IMMEDIATE:
 			StringAppendFormat(&compiler->output, " %d", result.location.immediate);
 			break;
 
-		case RESULT_LABEL:
+		case RESULT_LOCATION_LABEL:
 			StringAppendFormat(&compiler->output, " .L%d", result.location.label);
 			break;
 
@@ -110,60 +110,66 @@ static Result compileExprIntLiteral(Compiler* compiler, ExprIntLiteral* expr)
 {
 	// Every instruction except mov uses a 32 bit immediate mov uses a 64 bit immediate
 	Result result;
-	result.locationType = RESULT_IMMEDIATE;
+	result.locationType = RESULT_LOCATION_IMMEDIATE;
 	// Maybe put a switch statement here later
-	result.location.intImmediate = strtol(expr->literal.chars, NULL, 10);
-	DataType type;
-	result.type.type = DATA_TYPE_INT;
-	result.type.isUnsigned = false;
+	result.location.intImmediate = strtol(expr->literal.text.chars, NULL, 10);
+	//DataType type;
+	
+	result.dataType.type = DATA_TYPE_INT;
+	result.dataType.isUnsigned = false;
 	return result;
 }
 
-// Returns the base offset to variable
-static size_t allocateOnStack(Compiler* compiler, size_t size)
+// Returns the base offset
+static size_t allocateSingleVariableOnStack(Compiler* compiler, size_t size)
 {
-	// Fix this
-	compiler->stackAllocationSize += ALIGN_UP_TO(4, size);
+	// On x86 data in memory should be aligned to the size of the data.
+	// If memory is not aligned the cpu might need to perform 2 loads or with some instructions the program might crash.
+	compiler->stackAllocationSize = ALIGN_UP_TO(size, compiler->stackAllocationSize) + size;
 	return compiler->stackAllocationSize;
 }
 
-static bool isResultLocationMemory(ResultType locationType)
+static bool isResultLocationMemory(ResultLocationType locationType)
 {
-	return (locationType == RESULT_BASE_OFFSET) || (locationType == RESULT_LABEL);
+	return (locationType == RESULT_LOCATION_BASE_OFFSET) || (locationType == RESULT_LOCATION_LABEL);
 }
 
-static bool isResultLocationRegister(ResultType locationType)
+static bool isResultLocationRegister(ResultLocationType locationType)
 {
-	return locationType == RESULT_REGISTER;
+	return locationType == RESULT_LOCATION_REGISTER_GP;
 }
 
-static bool isResultLocationImmediate(ResultType locationType)
+static bool isResultLocationImmediate(ResultLocationType locationType)
 {
-	return locationType == RESULT_IMMEDIATE;
+	return locationType == RESULT_LOCATION_IMMEDIATE;
 }
 
 // What to do if register allocation failure
 // Could return a memory location but there are problems with stack alignment
-static Result moveToRegister(Compiler* compiler, Result value, bool* failedToAllocate)
+static bool moveToRegister(Compiler* compiler, Result value, Result* result)
 {
-	Result result;
-	result.type = value.type;
-	result.locationType = RESULT_REGISTER;
-	result.location.reg = allocateRegister(compiler);
+	RegisterGp reg = allocateGpRegister(compiler);
 
-	if (result.location.reg == -1)
-	{
-		*failedToAllocate = true;
-		return result;
-	}
-	else
-	{
-		*failedToAllocate = false;
-	}
+	if (reg == -1)
+		return false;
 
-	emitInstruction(compiler, "mov %s,", RegisterGpToString(result.location.reg, DataTypeSize(value.type)));
+	result->locationType = RESULT_LOCATION_REGISTER_GP;
+	result->location.registerGp = reg;
+
+	emitInstruction(compiler, "mov %s,", RegisterGpToString(result->location.registerGp, DataTypeSize(value.dataType)));
 	emitResultLocation(compiler, value);
-	return result;
+
+	return true;
+}
+
+Result allocateTemp(Compiler* compiler)
+{
+	Result temp;
+	// Don't know the size of temp so just use QWORD
+	temp.location.baseOffset = allocateSingleVariableOnStack(compiler, 8);
+	temp.locationType = RESULT_LOCATION_BASE_OFFSET;
+	temp.dataType.type = DATA_TYPE_LONG;
+	return temp;
 }
 
 // Requires types to already be converted
@@ -177,49 +183,83 @@ static Result compileAddition(Compiler* compiler, Result lhs, Result rhs)
 {
 	Result result;
 	// Later do conversion Type binaryExpressionConversionType
-	if ((lhs.locationType == RESULT_IMMEDIATE) && (rhs.locationType == RESULT_IMMEDIATE))
+	if ((lhs.locationType == RESULT_LOCATION_IMMEDIATE) && (rhs.locationType == RESULT_LOCATION_IMMEDIATE))
 	{
-		result.locationType = RESULT_IMMEDIATE;
+		result.locationType = RESULT_LOCATION_IMMEDIATE;
 		result.location.immediate = rhs.location.immediate + lhs.location.immediate;
 		return result;
 	}
 
-	bool isLhsMemoryLocation = isResultLocationMemory(lhs.locationType);
-	bool isRhsMemoryLocation = isResultLocationMemory(rhs.locationType);
+	RegisterGp savedRegisterLhs = -1;
+	Result tempLocationLhs = {1, 1, 1};
+	RegisterGp savedRegisterRhs = -1;
+	Result tempLocationRhs = { 1, 1, 1 };
 
-	Register savedRegisterLhs = -1;
-	Result tempLocationLhs;
-	Register savedRegisterRhs = -1;
-	Result tempLocationRhs;
-
-	if (isLhsMemoryLocation)
+	if (lhs.locationType != RESULT_LOCATION_REGISTER_GP)
 	{
-		bool failedToAllocate;
-		lhs = moveToRegister(compiler, lhs, &failedToAllocate);
-		if (failedToAllocate)
+		if (moveToRegister(compiler, lhs, &lhs) == false)
 		{
+			savedRegisterLhs = 0;
+			tempLocationLhs = allocateTemp(compiler);
+			emitInstruction(compiler, "mov");
+			emitResultLocation(compiler, tempLocationLhs);
+			emitText(compiler, ", %s", RegisterGpToString(savedRegisterLhs, 8));
+
+			emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterLhs, DataTypeSize(lhs.dataType)));
+			emitResultLocation(compiler, lhs);
 			
+			lhs.locationType = RESULT_LOCATION_REGISTER_GP;
+			lhs.location.registerGp = savedRegisterLhs;
 		}
 	}
-	if (isRhsMemoryLocation)
+	if (rhs.locationType != RESULT_LOCATION_REGISTER_GP)
 	{
-		bool failedToAllocate;
-		rhs = moveToRegister(compiler, rhs, &failedToAllocate);
-		if (failedToAllocate)
+		if (moveToRegister(compiler, rhs, &rhs) == false)
 		{
+			for (int i = 0; i < REGISTER_GP_COUNT; i++)
+			{
+				if (i != savedRegisterLhs)
+				{
+					savedRegisterRhs = i;
+					break;
+				}
+			}
+			tempLocationRhs = allocateTemp(compiler);
+			emitInstruction(compiler, "mov");
+			emitResultLocation(compiler, tempLocationRhs);
+			emitText(compiler, ", %s", RegisterGpToString(savedRegisterRhs, 8));
+
+			emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterRhs, DataTypeSize(rhs.dataType)));
+			emitResultLocation(compiler, rhs);
+
+			rhs.locationType = RESULT_LOCATION_REGISTER_GP;
+			rhs.location.registerGp = savedRegisterRhs;
 		}
 	}
 
 	emitInstruction(compiler, "add");
 	emitResultLocation(compiler, lhs);
-	emitText(compiler, ",");
+	emitText(compiler, "%s", ",");
 	emitResultLocation(compiler, rhs);
-	if (rhs.locationType == RESULT_REGISTER)
-		freeRegister(compiler, rhs.location.reg);
+	if (rhs.locationType == RESULT_LOCATION_REGISTER_GP && savedRegisterRhs == -1)
+		freeGpRegister(compiler, rhs.location.registerGp);
 
 	if (savedRegisterLhs != -1)
 	{
-		
+		Result resultTemp = allocateTemp(compiler);
+		emitInstruction(compiler, "mov", RegisterGpToString(savedRegisterLhs, 8));
+		emitResultLocation(compiler, resultTemp);
+		emitText(compiler, ", %s", RegisterGpToString(savedRegisterLhs, 8));
+
+		emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterLhs, 8));
+		emitResultLocation(compiler, tempLocationLhs);
+		lhs.locationType = RESULT_LOCATION_BASE_OFFSET;
+	}
+
+	if (savedRegisterRhs != -1)
+	{
+		emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterRhs, 8));
+		emitResultLocation(compiler, tempLocationRhs);
 	}
 
 	return lhs;
@@ -254,7 +294,7 @@ static DataType binaryExpressionGetResultingType(DataType a, DataType b)
 
 static Result convertToType(Compiler* compiler, DataType type, Result value)
 {
-	if (value.type.type == type.type)
+	if (value.dataType.type == type.type)
 		return value;
 
 	ASSERT_NOT_REACHED();
@@ -264,7 +304,7 @@ static Result compileExprBinary(Compiler* compiler, ExprBinary* expr)
 {
 	Result a = compileExpr(compiler, expr->left);
 	Result b = compileExpr(compiler, expr->right);
-	DataType resultingType = binaryExpressionGetResultingType(a.type, b.type);
+	DataType resultingType = binaryExpressionGetResultingType(a.dataType, b.dataType);
 	Result lhs = convertToType(compiler, resultingType, a);
 	Result rhs = convertToType(compiler, resultingType, b);
 
@@ -282,27 +322,23 @@ static Result compileExprBinary(Compiler* compiler, ExprBinary* expr)
 static Result compileExprIdentifier(Compiler* compiler, ExprIdentifier* expr)
 {
 	Result result;
-	result.locationType = RESULT_BASE_OFFSET;
+	result.locationType = RESULT_LOCATION_BASE_OFFSET;
 
 	// Change this later to string view 
-	StringView name = StringViewInit(expr->name.chars, expr->name.length);
+	StringView name = StringViewInit(expr->name.text.chars, expr->name.text.length);
 	LocalVariable variable;
 	if (LocalVariableTableGet(&compiler->locals, &name, &variable) == false)
 	{
-		errorAt(compiler, expr->name, "'%.*s' undeclared", expr->name.length, expr->name.chars);
+		errorAt(compiler, expr->name, "'%.*s' undeclared", expr->name.text.length, expr->name.text.chars);
 	}
 
 	result.location.baseOffset = variable.baseOffset;
-	result.type = variable.type;
+	result.dataType = variable.type;
 	return result;
 }
 
-#include "AstPrinter.h"
-
 static Result compileExpr(Compiler* compiler, Expr* expr)
 {
-	printExpr(expr, 0);
-	puts("");
 	switch (expr->type)
 	{
 		case EXPR_BINARY: return compileExprBinary(compiler, (ExprBinary*)expr); 
@@ -312,8 +348,7 @@ static Result compileExpr(Compiler* compiler, Expr* expr)
 
 		default:
 			ASSERT_NOT_REACHED();
-			break;
-	}
+	}	
 }
 
 static void compileStmtExpression(Compiler* compiler, StmtExpression* stmt)
@@ -328,9 +363,9 @@ static void compileStmtVariableDeclaration(Compiler* compiler, StmtVariableDecla
 	//if (stmt->initializer != NULL)
 
 	LocalVariable variable;
-	variable.baseOffset = allocateOnStack(compiler, DataTypeSize(stmt->type));
+	variable.baseOffset = allocateSingleVariableOnStack(compiler, DataTypeSize(stmt->type));
 	variable.type = stmt->type;
-	StringView variableName = StringViewInit(stmt->name.chars, stmt->name.length);
+	StringView variableName = stmt->name.text;
 	LocalVariableTableSet(&compiler->locals, &variableName, variable);
 	
 	// if is integral data type

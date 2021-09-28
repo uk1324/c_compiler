@@ -25,3 +25,11 @@ Ast function can have isLeaf that will be set during semnatic analysis
 Leaf function don't need to allocate on the stack the top of the stack for themselves
 
 Stack has to be aligned to 128 bits on function call for simd instructions
+
+
+Semantic analysis is mostly used for type cheking and could also be used for variable binding.
+This compiler doesn't need a semantic analizer because c requires a declaration to appear before
+use of a type. In higher level languages like javascript name binding could be done at runtime without analysing the generated ast beforehand.
+
+An optimizing compiler might benefit from time checking because it knows the resulting type of an expression
+and can optimize it better for example using the floating point registers for things like (a < b) + 2.0

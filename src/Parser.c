@@ -47,7 +47,7 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 		? parser->scanner->dataEnd - (parser->scanner->dataStart - lineStartOffsets->data[line - 1])
 		: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
 
-	int offsetInLine = (token->chars - parser->scanner->dataStart) - lineStartOffsets->data[line - 1];
+	int offsetInLine = (token->text.chars - parser->scanner->dataStart) - lineStartOffsets->data[line - 1];
 
 	fprintf(
 		stderr,
@@ -58,7 +58,7 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 		lineLength,
 		&parser->scanner->dataStart[parser->scanner->lineStartOffsets.data[line - 1]],
 		offsetInLine, " ",
-		token->length - 1, "~"
+		token->text.length - 1, "~"
 	);
 }
 
@@ -178,34 +178,34 @@ static Expr* unary(Parser* parser)
 // https://www.khanacademy.org/math/cc-sixth-grade-math/cc-6th-expressions-and-variables/cc-6th-evaluating-expressions/e/identifying-parts-of-expressions
 static Expr* term(Parser* parser)
 {
-	Expr* left = unary(parser);
+	Expr* expr = unary(parser);
 
-	if ((match(parser, TOKEN_SLASH)) || (match(parser, TOKEN_ASTERISK)) || (match(parser, TOKEN_PERCENT)))
+	while ((match(parser, TOKEN_SLASH)) || (match(parser, TOKEN_ASTERISK)) || (match(parser, TOKEN_PERCENT)))
 	{
-		ExprBinary* expr = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
-		expr->left = left;
-		expr->operator = parser->previous.type;
-		expr->right = term(parser);
-		return (Expr*)expr;
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous.type;
+		temp->right = unary(parser);
+		expr = (Expr*)temp;
 	}
 
-	return left;
+	return expr;
 }
 
 static Expr* factor(Parser* parser)
 {
-	Expr* left = term(parser);
+	Expr* expr = term(parser);
 
-	if ((match(parser, TOKEN_PLUS)) || (match(parser, TOKEN_MINUS)))
+	while ((match(parser, TOKEN_PLUS)) || (match(parser, TOKEN_MINUS)))
 	{
-		ExprBinary* expr = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
-		expr->left = left;
-		expr->operator = parser->previous.type;
-		expr->right = factor(parser);
-		return (Expr*)expr;
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous.type;
+		temp->right = term(parser);
+		expr = (Expr*)temp;
 	}
-
-	return left;
+	
+	return (Expr*)expr;
 }
 
 static Expr* expression(Parser* parser)
@@ -215,10 +215,13 @@ static Expr* expression(Parser* parser)
 
 //static StmtList* 
 
+#include "AstPrinter.h"
+
 static Stmt* expressionStatement(Parser* parser)
 {
 	StmtExpression* expressionStmt = (StmtExpression*)StmtAllocate(sizeof(StmtExpression), STMT_EXPRESSION);
 	expressionStmt->expresssion = expression(parser);
+	printExpr(expressionStmt->expresssion, 0);
 	consume(parser, TOKEN_SEMICOLON, "expected ';'");
 	return (Stmt*)expressionStmt;
 }

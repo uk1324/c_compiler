@@ -5,6 +5,11 @@
 
 #include <stdbool.h>
 
+// Maybe add a parse time data type
+// It will contain types like identifier, struct, struct identifier, and fucntion pointer
+// struct type could be used for declarations like
+// struct { int x, int y } a;
+
 typedef struct
 {
 	Scanner* scanner;

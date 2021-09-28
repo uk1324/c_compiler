@@ -167,7 +167,7 @@ void printExpr(Expr* expression, int depth)
 		case EXPR_INT_LITERAL:
 		{
 			ExprIntLiteral* expr = (ExprIntLiteral*)expression;
-			printf("%.*s", expr->literal.length, expr->literal.chars);
+			printf("%.*s", expr->literal.text.length, expr->literal.text.chars);
 			//printMemberSeparator();
 			break;
 		}
@@ -190,6 +190,13 @@ void printExpr(Expr* expression, int depth)
 			printf("(");
 			printExpr(expr->expression, depth + 1);
 			printf(")");
+			break;
+		}
+
+		case EXPR_IDENTIFIER:
+		{
+			ExprIdentifier* expr = (ExprIdentifier*)expression;
+			printf("%.*s", expr->name.text.length, expr->name.text.chars);
 			break;
 		}
 

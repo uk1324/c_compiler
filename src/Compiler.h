@@ -4,14 +4,12 @@
 #include "String.h"
 #include "Variable.h"
 #include "Parser.h"
+#include "Registers.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
 // https://wiki.osdev.org/Calling_Conventions
-// Make Alignment.h with align macro
-// Maybe store the variable size in variable type enum
-// store additional data in variable if type is function or struct maybe function pointer but you should be able to call convert pointers so i don't know
 
 // https://en.cppreference.com/w/c/language/bit_field
 // Maybe use bitfield union for register allocation 
@@ -19,34 +17,25 @@
 // https://en.wikipedia.org/wiki/C11_(C_standard_revision)
 // Maybe use _Generic instead of align macro
 
-// Annymous structs and unions are C11
-
-#define REGISTER_COUNT 16
-
-typedef int Register;
-
 typedef enum
 {
-	RESULT_REGISTER,
-	RESULT_BASE_OFFSET,
-	RESULT_LABEL,
-	RESULT_IMMEDIATE,
-	// Find a better name
-	RESULT_FLAGS,
-} ResultType;
+	RESULT_LOCATION_REGISTER_GP,
+	RESULT_LOCATION_REGISTER_SIMD,
+	RESULT_LOCATION_BASE_OFFSET,
+	RESULT_LOCATION_LABEL,
+	RESULT_LOCATION_IMMEDIATE,
+} ResultLocationType;
 
 
 typedef struct
 {
-	// Find a better name
-	ResultType locationType;
-	DataType type;
-	// Add isSigned or usigned
-	// and Result size
-	// result type can contain the size of the value but that might be confusing
+	ResultLocationType locationType;
+	DataType dataType;
+
 	union
 	{
-		Register reg;
+		RegisterGp registerGp;
+		RegisterSimd registerSimd;
 		uintptr_t baseOffset;
 		int label;
 		uint64_t immediate;
@@ -69,14 +58,26 @@ typedef struct
 	{
 		union
 		{
-			bool array[REGISTER_COUNT];
+			bool array[REGISTER_GP_COUNT];
 			struct
 			{
 				bool rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
 					 r8,  r9,  r10, r11, r12, r13, r14, r15;
-			} reg;
+			} registerGp;
 		} as;
 	} isRegisterGpAllocated;
+
+	struct
+	{
+		union
+		{
+			bool array[REGISTER_SIMD_COUNT];
+			struct
+			{
+				bool xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
+			} registerGp;
+		} as;
+	} isRegisterSimdAllocated;
 
 	// Later add scopes maybe store the current scope source so at the end of the scope the stack space is known
 	LocalVariableTable locals;

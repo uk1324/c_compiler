@@ -19,6 +19,10 @@ void ScannerInit(Scanner* scanner, const char* filename, const char* text, size_
 	scanner->tokenStart = text;
 }
 
+void ScannerReset(Scanner* scanner, const char* filename, const char* text, size_t length)
+{
+}
+
 void ScannerFree(Scanner* scanner)
 {
 	IntArrayFree(&scanner->lineStartOffsets);
@@ -49,8 +53,8 @@ static void error(Scanner* scanner, const char* message)
 static Token makeToken(Scanner* scanner, TokenType type)
 {
 	Token token;
-	token.chars = scanner->tokenStart;
-	token.length = scanner->currentChar - scanner->tokenStart;
+	token.text.chars = scanner->tokenStart;
+	token.text.length = scanner->currentChar - scanner->tokenStart;
 	token.type = type;
 	token.line = scanner->line;
 	scanner->tokenStart = scanner->currentChar;
@@ -60,8 +64,8 @@ static Token makeToken(Scanner* scanner, TokenType type)
 static Token errorToken()
 {
 	Token token;
-	token.chars = "";
-	token.length = 0;
+	token.text.chars = "";
+	token.text.length = 0;
 	token.type = TOKEN_ERROR;
 	return token;
 }
@@ -278,6 +282,7 @@ static Token scanToken(Scanner* scanner)
 
 	// Maybe use a macro for makeToken
 	// Use ternary match for decrement increment
+	// Will have to add variants with asigment to many operators
 	switch (chr)
 	{
 		case '+': return makeToken(scanner, TOKEN_PLUS);
@@ -288,7 +293,42 @@ static Token scanToken(Scanner* scanner)
 		case ')': return makeToken(scanner, TOKEN_RIGHT_PAREN);
 		case ';': return makeToken(scanner, TOKEN_SEMICOLON);
 		case '=': return makeToken(scanner, TOKEN_EQUALS);
-			
+		case '~': return makeToken(scanner, TOKEN_TILDE);
+
+		case '|': 
+		{
+			if (match(scanner, '|'))
+			{
+				return makeToken(scanner, TOKEN_PIPE_PIPE);
+			}
+			return makeToken(scanner, TOKEN_PIPE);
+		}
+
+		case '<':
+		{
+			if (match(scanner, '<'))
+			{
+				return makeToken(scanner, TOKEN_LESS_THAN_LESS_THAN);
+			}
+			else if (match(scanner, '='))
+			{
+				return makeToken(scanner, TOKEN_LESS_THAN_EQUALS);
+			}
+			return makeToken(scanner, TOKEN_LESS_THAN);
+		}
+		case '>':
+		{
+			if (match(scanner, '>'))
+			{
+				return makeToken(scanner, TOKEN_MORE_THAN_MORE_THAN);
+			}
+			else if (match(scanner, '='))
+			{
+				return makeToken(scanner, TOKEN_MORE_THAN_EQUALS);
+			}
+			return makeToken(scanner, TOKEN_MORE_THAN);
+		}
+
 		default:
 			error(scanner, "invalid char");
 			return errorToken();

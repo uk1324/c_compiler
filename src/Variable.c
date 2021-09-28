@@ -34,6 +34,7 @@ size_t DataTypeSize(DataType type)
 	// Add if for struct
 	switch (type.type)
 	{
+		case DATA_TYPE_LONG: return 8;
 		case DATA_TYPE_INT: return 4;
 		case DATA_TYPE_SHORT: return 2;
 

@@ -11,9 +11,10 @@ typedef enum
 {
 	DATA_TYPE_INT,
 	DATA_TYPE_SHORT,
+	DATA_TYPE_LONG,
 	DATA_TYPE_LONG_DOUBLE,
 	DATA_TYPE_DOUBLE,
-	DATA_TYPE_FLOAT
+	DATA_TYPE_FLOAT,
 } DataTypeType;
 
 typedef struct
@@ -32,22 +33,7 @@ size_t DataTypeSize(DataType type);
 typedef struct
 {
 	DataType type;
-
-	size_t baseOffset;
-	
-	bool isUnsigned;
-	//union 
-	//{
-	//	// Struct
-	//	// function
-	//};
-
-} Variable;
-
-typedef struct
-{
-	DataType type;
-	// Real offset is bp[-baseOffset]
+	// Real position is [rbp-baseOffset]
 	size_t baseOffset;
 } LocalVariable;
 
@@ -57,5 +43,4 @@ typedef struct
 	int labelIndex;
 } GlobalVariable;
 
-//TABLE_TEMPLATE_DECLARATION(VariableTable, String, Variable)
 TABLE_TEMPLATE_DECLARATION(LocalVariableTable, StringView, LocalVariable)
