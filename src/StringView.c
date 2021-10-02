@@ -8,6 +8,11 @@ StringView StringViewInit(const char* chars, size_t length)
 	return view;
 }
 
+StringView StringViewFromString(const String* string)
+{
+	return StringViewInit(string->chars, string->length);
+}
+
 size_t StringViewHash(const StringView* view)
 {
 	size_t hash = 0;

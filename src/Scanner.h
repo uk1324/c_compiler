@@ -51,17 +51,22 @@ typedef struct
 
 typedef struct
 {
-	char* filename;
+	const char* filename;
 	IntArray lineStartOffsets;
 } FileInfo;
+
+void FileInfoInit(FileInfo* fileInfo);
+void FileInfoFree(FileInfo* fileInfo);
 
 typedef struct
 {
 	int line;
 	int charInLine;
 
-	IntArray lineStartOffsets;
-	const char* filename;
+	FileInfo* fileInfo;
+
+	/*IntArray lineStartOffsets;
+	const char* filename;*/
 
 	const char* dataStart;
 	const char* dataEnd;
@@ -70,8 +75,9 @@ typedef struct
 	const char* currentChar;
 } Scanner;
 
-void ScannerInit(Scanner* scanner, const char* filename, const char* text, size_t length);
-void ScannerReset(Scanner* scanner, const char* filename, const char* text, size_t length);
+//void ScannerInit(Scanner* scanner, const char* filename, const char* text, size_t length);
+void ScannerReset(Scanner* scanner, FileInfo* fileInfo, StringView source);
+void ScannerInit(Scanner* scanner);
 void ScannerFree(Scanner* scanner);
 
 Token ScannerNextToken(Scanner* scanner);

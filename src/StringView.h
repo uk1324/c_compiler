@@ -1,5 +1,7 @@
 #pragma once
 
+#include "String.h"
+
 #include <stddef.h>
 
 typedef struct
@@ -10,4 +12,5 @@ typedef struct
 } StringView;
 
 StringView StringViewInit(const char* chars, size_t length);
+StringView StringViewFromString(const String* string);
 size_t StringViewHash(const StringView* view);

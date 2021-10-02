@@ -12,7 +12,7 @@
 
 typedef struct
 {
-	Scanner* scanner;
+	Scanner scanner;
 	// Could rename this to previousToken
 	Token current;
 	Token previous;
@@ -23,7 +23,7 @@ typedef struct
 
 // Add check that eof is reached
 // Maybe change thye scanner this later
-void ParserInit(Parser* parser, Scanner* scanner);
+void ParserInit(Parser* parser);
 void ParserFree(Parser* parser);
 
-StmtArray ParserParse(Parser* parser);
+StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut);

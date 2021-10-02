@@ -2,17 +2,16 @@
 #include "TerminalColors.h" 
 #include "Variable.h"
 
-void ParserInit(Parser* parser, Scanner* scanner)
+void ParserInit(Parser* parser)
 {
-	parser->scanner = scanner;
-	parser->current = ScannerNextToken(scanner);
-	parser->hadError = false;
-	parser->isSynchronizing = false;
+	ScannerInit(&parser->scanner);
+	//parser->scanner = scanner;
+	//parser->current = ScannerNextToken(scanner);
 }
 
 void ParserFree(Parser* parser)
 {
-
+	ScannerFree(&parser->scanner);
 }
 
 static void advance(Parser* parser);
@@ -42,21 +41,21 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 	parser->isSynchronizing = true;
 
 	size_t line = (size_t)token->line;
-	IntArray* lineStartOffsets = &parser->scanner->lineStartOffsets;
+	IntArray* lineStartOffsets = &parser->scanner.fileInfo->lineStartOffsets;
 	int lineLength = (line == lineStartOffsets->size)
-		? parser->scanner->dataEnd - (parser->scanner->dataStart - lineStartOffsets->data[line - 1])
+		? parser->scanner.dataEnd - (parser->scanner.dataStart - lineStartOffsets->data[line - 1])
 		: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
 
-	int offsetInLine = (token->text.chars - parser->scanner->dataStart) - lineStartOffsets->data[line - 1];
+	int offsetInLine = (token->text.chars - parser->scanner.dataStart) - lineStartOffsets->data[line - 1];
 
 	fprintf(
 		stderr,
 		"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
 		"\n%.*s\n"
 		"%*s" TERM_COL_GREEN "^%*s" TERM_COL_RESET "\n",
-		parser->scanner->filename, line, offsetInLine, message,
+		parser->scanner.fileInfo->filename, line, offsetInLine, message,
 		lineLength,
-		&parser->scanner->dataStart[parser->scanner->lineStartOffsets.data[line - 1]],
+		&parser->scanner.dataStart[parser->scanner.fileInfo->lineStartOffsets.data[line - 1]],
 		offsetInLine, " ",
 		token->text.length - 1, "~"
 	);
@@ -78,7 +77,7 @@ static void advance(Parser* parser)
 	if (isAtEnd(parser) == false)
 	{
 		parser->previous = parser->current;
-		parser->current = ScannerNextToken(parser->scanner);
+		parser->current = ScannerNextToken(&parser->scanner);
 
 		if (parser->current.type == TOKEN_ERROR)
 			parser->hadError = true;
@@ -215,13 +214,13 @@ static Expr* expression(Parser* parser)
 
 //static StmtList* 
 
-#include "AstPrinter.h"
+//#include "AstPrinter.h"
 
 static Stmt* expressionStatement(Parser* parser)
 {
 	StmtExpression* expressionStmt = (StmtExpression*)StmtAllocate(sizeof(StmtExpression), STMT_EXPRESSION);
 	expressionStmt->expresssion = expression(parser);
-	printExpr(expressionStmt->expresssion, 0);
+	//printExpr(expressionStmt->expresssion, 0);
 	consume(parser, TOKEN_SEMICOLON, "expected ';'");
 	return (Stmt*)expressionStmt;
 }
@@ -256,8 +255,24 @@ static Stmt* statement(Parser* parser)
 		return expressionStatement(parser);
 }
 
-StmtArray ParserParse(Parser* parser)
+//StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut)
+//{
+//	//parser->hadError = false;
+//	//parser->isSynchronizing = false;
+//	//parser->current = ScannerNextToken(&parser->scanner);
+//	//ScannerReset(parser->s)
+//}
+
+StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut)
 {
+	parser->hadError = false;
+	parser->isSynchronizing = false;
+	ScannerReset(&parser->scanner, fileInfoToFillOut, source);
+	parser->current = ScannerNextToken(&parser->scanner);
+
+	parser->scanner.fileInfo = fileInfoToFillOut;
+	parser->scanner.fileInfo->filename = filename;
+
 	StmtArray array;
 	StmtArrayInit(&array);
 	while (isAtEnd(parser) == false)

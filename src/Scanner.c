@@ -5,27 +5,39 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-void ScannerInit(Scanner* scanner, const char* filename, const char* text, size_t length)
+void FileInfoInit(FileInfo* fileInfo)
+{
+	IntArrayInit(&fileInfo->lineStartOffsets);
+}
+
+void FileInfoFree(FileInfo* fileInfo)
+{
+	IntArrayFree(&fileInfo->lineStartOffsets);
+}
+
+void ScannerReset(Scanner* scanner, FileInfo* fileInfo, StringView source)
 {
 	scanner->line = 1;
 	scanner->charInLine = 0;
-	IntArrayInit(&scanner->lineStartOffsets);
-	IntArrayAppend(&scanner->lineStartOffsets, 0);
-	scanner->filename = filename;
 
-	scanner->dataStart = text;
-	scanner->dataEnd = text + length;
-	scanner->currentChar = text;
-	scanner->tokenStart = text;
+	scanner->fileInfo = fileInfo;
+	IntArrayClear(&scanner->fileInfo->lineStartOffsets);
+	IntArrayAppend(&scanner->fileInfo->lineStartOffsets, 0);
+
+	scanner->dataStart = source.chars;
+	scanner->dataEnd = source.chars + source.length;
+	scanner->currentChar = source.chars;
+	scanner->tokenStart = source.chars;
 }
 
-void ScannerReset(Scanner* scanner, const char* filename, const char* text, size_t length)
+void ScannerInit(Scanner* scanner)
 {
+
 }
 
 void ScannerFree(Scanner* scanner)
 {
-	IntArrayFree(&scanner->lineStartOffsets);
+
 }
 
 static void error(Scanner* scanner, const char* message)
@@ -43,9 +55,9 @@ static void error(Scanner* scanner, const char* message)
 		"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
 		"\n%.*s\n"
 		"%*s" TERM_COL_GREEN "^" TERM_COL_RESET "\n",
-		scanner->filename, scanner->line, scanner->charInLine, message,
+		scanner->fileInfo->filename, scanner->line, scanner->charInLine, message,
 		scanner->charInLine + endOfLineDistance,
-		&scanner->dataStart[scanner->lineStartOffsets.data[scanner->line - 1]],
+		&scanner->dataStart[scanner->fileInfo->lineStartOffsets.data[scanner->line - 1]],
 		scanner->charInLine - 1, " "
 	);
 }
@@ -80,7 +92,7 @@ static void advanceLine(Scanner* scanner)
 {
 	scanner->charInLine = 0;
 	scanner->line++;
-	IntArrayAppend(&scanner->lineStartOffsets, scanner->currentChar - scanner->dataStart);
+	IntArrayAppend(&scanner->fileInfo->lineStartOffsets, scanner->currentChar - scanner->dataStart);
 }
 
 static bool isAtEnd(Scanner* scanner)

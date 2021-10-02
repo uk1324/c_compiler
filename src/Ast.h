@@ -5,6 +5,13 @@
 
 // Should make more things const
 
+// Could implement the visitor pattern with a cost of one virtual call
+// There would be a vtable in the Expr or Stmt class contaning a function for every visitor
+// for example Result acceptCompilerVisitor(Compiler* compiler, Stmt* stmt);
+// In this example the compiler would implement all the methods like CompilerAcceptExprBinary
+// That the vtable function would use.
+// Could automate generating of both using macros.
+
 typedef enum
 {
 	EXPR_BINARY,

@@ -80,11 +80,12 @@ typedef struct
 	} isRegisterSimdAllocated;
 
 	// Later add scopes maybe store the current scope source so at the end of the scope the stack space is known
+	// Maybe rename to localVariables
 	LocalVariableTable locals;
 	size_t stackAllocationSize;
 
 } Compiler;
 
 void CompilerInit(Compiler* compiler);
-// Parser for line information
+void CompilerFree(Compiler* compiler);
 void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast);

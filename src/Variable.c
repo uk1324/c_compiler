@@ -31,6 +31,7 @@ TABLE_TEMPLATE_DEFINITION(LocalVariableTable, StringView, LocalVariable, StringV
 
 size_t DataTypeSize(DataType type)
 {
+	
 	// Add if for struct
 	switch (type.type)
 	{

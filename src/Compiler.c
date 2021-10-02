@@ -4,6 +4,16 @@
 
 #include <stdarg.h>
 
+void CompilerInit(Compiler* compiler)
+{
+	LocalVariableTableInit(&compiler->locals);
+}
+
+void CompilerFree(Compiler* compiler)
+{
+	LocalVariableTableFree(&compiler->locals);
+}
+
 static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 {
 	va_list args;
@@ -12,7 +22,6 @@ static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 	va_end(args);
 	printf("\n");
 }
-
 
 static void freeGpRegister(Compiler* compiler, RegisterGp reg)
 {
@@ -390,14 +399,9 @@ static void compileStmt(Compiler* compiler, Stmt* stmt)
 	}
 }
 
-void CompilerInit(Compiler* compiler)
-{
-	LocalVariableTableInit(&compiler->locals);
-}
-
+// Make it return a String object;
 void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast)
 {
-	CompilerInit(compiler);
 	compiler->parser = parser;
 	compiler->output = StringCopy("");
 	compiler->stackAllocationSize = 0;
@@ -408,6 +412,9 @@ void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast)
 		compileStmt(compiler, ast->data[i]);
 	}
 
+	// Later the user should free the output
+	StringFree(&compiler->output);
+
 	//printf("%d", compiler->stackAllocationSize);
-	puts(compiler->output.chars);
+	//puts(compiler->output.chars);
 }

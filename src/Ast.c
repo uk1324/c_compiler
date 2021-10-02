@@ -23,7 +23,6 @@ void ExprFree(Expr* expression)
 			ExprBinary* expr = (ExprBinary*)expression;
 			ExprFree(expr->left);
 			ExprFree(expr->right);
-			free(expr);
 			break;
 		}
 			
@@ -31,25 +30,24 @@ void ExprFree(Expr* expression)
 		{
 			ExprUnary* expr = (ExprUnary*)expression;
 			ExprFree(expr->operand);
-			free(expr);
 			break;
 		}
 
+		case EXPR_GROUPING:
+			ExprFree(((ExprGrouping*)expression)->expression);
+			break;
+
 		case EXPR_INT_LITERAL:
-			free(expression);
 			break;
 			
 		case EXPR_IDENTIFIER:
-			break;
-
-		case EXPR_GROUPING:
-			ExprFree(((ExprGrouping*)expression)->expression);
 			break;
 
 		default:
 			ASSERT_NOT_REACHED();
 			break;
 	}
+	free(expression);
 }
 
 static void copyStmt(Stmt** dst, Stmt** src)
@@ -92,4 +90,6 @@ void StmtFree(Stmt* statement)
 		default:
 			ASSERT_NOT_REACHED();
 	}
+
+	free(statement);
 }

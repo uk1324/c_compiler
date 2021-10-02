@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Could replace the grow capacity function with just one function for all types
+
 #define ARRAY_INITIAL_CAPACITY 4
 
 #define ARRAY_TEMPLATE_DECLARATION(arrayTypeName, itemType) \
@@ -15,7 +17,8 @@ typedef struct \
 } arrayTypeName; \
 void arrayTypeName##Init(arrayTypeName* array); \
 void arrayTypeName##Free(arrayTypeName* array); \
-void arrayTypeName##Append(arrayTypeName* array, itemType item);
+void arrayTypeName##Append(arrayTypeName* array, itemType item); \
+void arrayTypeName##Clear(arrayTypeName* array);
 
 // void copyItemType(itemType* destination, itemType* source)
 // void freeItemType(itemType* ptr)
@@ -59,4 +62,12 @@ void arrayTypeName##Append(arrayTypeName* array, itemType item) \
 	} \
 	copyItemType(&array->data[array->size], &item); \
 	array->size++; \
+} \
+void arrayTypeName##Clear(arrayTypeName* array) \
+{ \
+	for (size_t i = 0; i < array->size; i++) \
+	{ \
+		freeItemType(&array->data[i]); \
+	} \
+	array->size = 0; \
 }
