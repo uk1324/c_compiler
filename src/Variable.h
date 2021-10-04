@@ -15,6 +15,7 @@ typedef enum
 	DATA_TYPE_LONG_DOUBLE,
 	DATA_TYPE_DOUBLE,
 	DATA_TYPE_FLOAT,
+	DATA_TYPE_ERROR
 } DataTypeType;
 
 typedef struct

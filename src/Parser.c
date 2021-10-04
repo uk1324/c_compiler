@@ -40,25 +40,27 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 	parser->hadError = true;
 	parser->isSynchronizing = true;
 
-	size_t line = (size_t)token->line;
-	IntArray* lineStartOffsets = &parser->scanner.fileInfo->lineStartOffsets;
-	int lineLength = (line == lineStartOffsets->size)
-		? parser->scanner.dataEnd - (parser->scanner.dataStart - lineStartOffsets->data[line - 1])
-		: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
+	// The lines could not be fully scanned yet so this code is probaby garbage
 
-	int offsetInLine = (token->text.chars - parser->scanner.dataStart) - lineStartOffsets->data[line - 1];
+	//size_t line = (size_t)token->line;
+	//IntArray* lineStartOffsets = &parser->scanner.fileInfo->lineStartOffsets;
+	//int lineLength = (line == lineStartOffsets->size)
+	//	? parser->scanner.dataEnd - (parser->scanner.dataStart - lineStartOffsets->data[line - 1])
+	//	: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
 
-	fprintf(
-		stderr,
-		"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
-		"\n%.*s\n"
-		"%*s" TERM_COL_GREEN "^%*s" TERM_COL_RESET "\n",
-		parser->scanner.fileInfo->filename, line, offsetInLine, message,
-		lineLength,
-		&parser->scanner.dataStart[parser->scanner.fileInfo->lineStartOffsets.data[line - 1]],
-		offsetInLine, " ",
-		token->text.length - 1, "~"
-	);
+	//int offsetInLine = (token->text.chars - parser->scanner.dataStart) - lineStartOffsets->data[line - 1];
+
+	//fprintf(
+	//	stderr,
+	//	"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
+	//	"\n%.*s\n"
+	//	"%*s" TERM_COL_GREEN "^%*s" TERM_COL_RESET "\n",
+	//	parser->scanner.fileInfo->filename, line, offsetInLine, message,
+	//	lineLength,
+	//	&parser->scanner.dataStart[parser->scanner.fileInfo->lineStartOffsets.data[line - 1]],
+	//	offsetInLine, " ",
+	//	token->text.length - 1, "~"
+	//);
 }
 
 static void error(Parser* parser, const char* message)
@@ -183,7 +185,7 @@ static Expr* term(Parser* parser)
 	{
 		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
 		temp->left = expr;
-		temp->operator = parser->previous.type;
+		temp->operator = parser->previous;
 		temp->right = unary(parser);
 		expr = (Expr*)temp;
 	}
@@ -199,7 +201,7 @@ static Expr* factor(Parser* parser)
 	{
 		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
 		temp->left = expr;
-		temp->operator = parser->previous.type;
+		temp->operator = parser->previous;
 		temp->right = term(parser);
 		expr = (Expr*)temp;
 	}
@@ -247,31 +249,44 @@ static Stmt* variableDeclaration(Parser* parser)
 	return (Stmt*)variableDeclaration;
 }
 
+static Stmt* returnStatement(Parser* parser)
+{
+	StmtReturn* stmt = (StmtReturn*)StmtAllocate(sizeof(StmtReturn), STMT_RETURN);
+
+	if (check(parser, TOKEN_SEMICOLON))
+		stmt->returnValue = NULL;
+	else
+		stmt->returnValue = expression(parser);
+
+	consume(parser, TOKEN_SEMICOLON, "Expected ';'");
+
+	return (Stmt*)stmt;
+}
+
 static Stmt* statement(Parser* parser)
 {
 	if (check(parser, TOKEN_INT))
 		return variableDeclaration(parser);
+	else if (match(parser, TOKEN_RETURN))
+		return returnStatement(parser);
 	else
 		return expressionStatement(parser);
 }
-
-//StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut)
-//{
-//	//parser->hadError = false;
-//	//parser->isSynchronizing = false;
-//	//parser->current = ScannerNextToken(&parser->scanner);
-//	//ScannerReset(parser->s)
-//}
 
 StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut)
 {
 	parser->hadError = false;
 	parser->isSynchronizing = false;
-	ScannerReset(&parser->scanner, fileInfoToFillOut, source);
-	parser->current = ScannerNextToken(&parser->scanner);
 
-	parser->scanner.fileInfo = fileInfoToFillOut;
-	parser->scanner.fileInfo->filename = filename;
+
+	fileInfoToFillOut->source = source;
+	fileInfoToFillOut->filename = filename;
+	ScannerReset(&parser->scanner, fileInfoToFillOut, source);
+	//parser->scanner.fileInfo = fileInfoToFillOut;
+	//parser->scanner.fileInfo->filename = filename;
+	//parser->scanner.fileInfo->source = source;
+
+	parser->current = ScannerNextToken(&parser->scanner);
 
 	StmtArray array;
 	StmtArrayInit(&array);

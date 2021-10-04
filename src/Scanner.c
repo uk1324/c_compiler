@@ -10,24 +10,41 @@ void FileInfoInit(FileInfo* fileInfo)
 	IntArrayInit(&fileInfo->lineStartOffsets);
 }
 
+// Don't know if it should remove the newline character
+StringView FileInfoGetLine(const FileInfo* fileInfo, size_t lineNumber)
+{
+	ASSERT((lineNumber) < fileInfo->lineStartOffsets.size);
+
+	StringView line;
+	const IntArray* lineStartOffsets = &fileInfo->lineStartOffsets;
+	const char* sourceEnd = fileInfo->source.chars + fileInfo->source.length;
+	line.chars = fileInfo->source.chars + lineStartOffsets->data[lineNumber];
+
+	line.length = (lineNumber == lineStartOffsets->size)
+		? sourceEnd - (fileInfo->source.chars - lineStartOffsets->data[lineNumber])
+		: lineStartOffsets->data[lineNumber + 1] - lineStartOffsets->data[lineNumber];
+	
+	return line;
+}
+
 void FileInfoFree(FileInfo* fileInfo)
 {
 	IntArrayFree(&fileInfo->lineStartOffsets);
 }
 
-void ScannerReset(Scanner* scanner, FileInfo* fileInfo, StringView source)
+void ScannerReset(Scanner* scanner, FileInfo* fileInfo)
 {
-	scanner->line = 1;
+	scanner->line = 0;
 	scanner->charInLine = 0;
 
 	scanner->fileInfo = fileInfo;
 	IntArrayClear(&scanner->fileInfo->lineStartOffsets);
 	IntArrayAppend(&scanner->fileInfo->lineStartOffsets, 0);
 
-	scanner->dataStart = source.chars;
-	scanner->dataEnd = source.chars + source.length;
-	scanner->currentChar = source.chars;
-	scanner->tokenStart = source.chars;
+	scanner->dataStart = fileInfo->source.chars;
+	scanner->dataEnd = fileInfo->source.chars + fileInfo->source.length;
+	scanner->currentChar = fileInfo->source.chars;
+	scanner->tokenStart = fileInfo->source.chars;
 }
 
 void ScannerInit(Scanner* scanner)
@@ -57,7 +74,7 @@ static void error(Scanner* scanner, const char* message)
 		"%*s" TERM_COL_GREEN "^" TERM_COL_RESET "\n",
 		scanner->fileInfo->filename, scanner->line, scanner->charInLine, message,
 		scanner->charInLine + endOfLineDistance,
-		&scanner->dataStart[scanner->fileInfo->lineStartOffsets.data[scanner->line - 1]],
+		&scanner->dataStart[scanner->fileInfo->lineStartOffsets.data[scanner->line]],
 		scanner->charInLine - 1, " "
 	);
 }
@@ -254,6 +271,11 @@ static Token identifierOrKeyword(Scanner* scanner)
 			KEYWORD("if", TOKEN_IF)
 			KEYWORD("int", TOKEN_INT)
 		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('r')
+			KEYWORD("return", TOKEN_RETURN)
+		KEYWORD_GROUP_END()
+
 	}
 
 	#undef KEYWORD
@@ -306,6 +328,8 @@ static Token scanToken(Scanner* scanner)
 		case ';': return makeToken(scanner, TOKEN_SEMICOLON);
 		case '=': return makeToken(scanner, TOKEN_EQUALS);
 		case '~': return makeToken(scanner, TOKEN_TILDE);
+		case '&': return makeToken(scanner, TOKEN_AMPERSAND);
+		case '^': return makeToken(scanner, TOKEN_CIRCUMFLEX);
 
 		case '|': 
 		{

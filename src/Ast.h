@@ -33,7 +33,7 @@ typedef struct
 {
 	Expr expr;
 	// Maybe later change to token
-	TokenType operator;
+	Token operator;
 	Expr* left;
 	Expr* right;
 } ExprBinary;
@@ -67,7 +67,8 @@ typedef struct
 typedef enum
 {
 	STMT_EXPRESSION,
-	STMT_VARIABLE_DECLARATION
+	STMT_VARIABLE_DECLARATION,
+	STMT_RETURN
 } StmtType;
 
 typedef struct
@@ -94,3 +95,10 @@ typedef struct
 	// Later also add thing like is struct maybe
 	DataType type;
 } StmtVariableDeclaration;
+
+typedef struct
+{
+	Stmt stmt;
+	Token location;
+	Expr* returnValue; // Can be NULL
+} StmtReturn;

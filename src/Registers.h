@@ -2,7 +2,7 @@
 
 #include <stddef.h>
 
-#define REGISTER_GP_COUNT 16
+#define REGISTER_GP_COUNT 3
 #define REGISTER_SIMD_COUNT 8
 
 #define SIZE_QWORD 8
@@ -32,6 +32,11 @@ typedef enum
 	REGISTER_R14,
 	REGISTER_R15,
 } RegisterGp;
+
+// Scratch register shouldn't be used to store results.
+// It is used to move temporaries.
+// Not sure yet but it might be used as for storing the rhs of simple binary expressions.
+#define REGISTER_GP_SCRATCH REGISTER_R12
 
 typedef enum
 {

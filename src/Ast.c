@@ -87,6 +87,13 @@ void StmtFree(Stmt* statement)
 			break;
 		}
 
+		case STMT_RETURN:
+		{
+			StmtReturn* stmt = (StmtReturn*)statement;
+			ExprFree(stmt->returnValue);
+			break;
+		}
+
 		default:
 			ASSERT_NOT_REACHED();
 	}

@@ -1,7 +1,8 @@
 int x = 1;
 int y = 2;
+int z = 6;
 int a = 3;
 int b = 4;
 int c = 5;
 
-(a + (x + y));
+return c + (x + y) + ((a - b) + ((a + b) + (z - x)));

@@ -26,6 +26,9 @@ static void errorAt(Compiler* compiler, Token location, const char* format, ...)
 static void freeGpRegister(Compiler* compiler, RegisterGp reg)
 {
 	ASSERT((size_t)reg < REGISTER_GP_COUNT);
+	ASSERT(reg != REGISTER_RSP);
+	ASSERT(reg != REGISTER_RBP);
+	ASSERT(reg != REGISTER_GP_SCRATCH);
 	compiler->isRegisterGpAllocated.as.array[reg] = false;
 }
 
@@ -38,6 +41,8 @@ static void freeGpRegisters(Compiler* compiler)
 
 	compiler->isRegisterGpAllocated.as.registerGp.rsp = true;
 	compiler->isRegisterGpAllocated.as.registerGp.rbp = true;
+
+	compiler->isRegisterGpAllocated.as.array[REGISTER_GP_SCRATCH] = true;
 }
 
 static RegisterGp allocateGpRegister(Compiler* compiler)
@@ -181,39 +186,36 @@ Result allocateTemp(Compiler* compiler)
 	return temp;
 }
 
-// Requires types to already be converted
-// Doesn't support volatile
-// Doesn't handle register allocation failure
-// Could just move both operands to registers so it is easier
-// It is hard to find the best instruction because of things like result being in the flags
-// Don't know how to handle that yet
-// Add allocateTemporary if no temeporary is free allocate new on the stack
-static Result compileAddition(Compiler* compiler, Result lhs, Result rhs)
+void freeTemp(Compiler* compiler, const Result* temp)
+{
+
+}
+
+// Handles operations that have encoding op reg, reg
+static Result compileSimpleIntBinaryExpression(Compiler* compiler, Result lhs, Result rhs, TokenType operator)
 {
 	Result result;
-	// Later do conversion Type binaryExpressionConversionType
-	if ((lhs.locationType == RESULT_LOCATION_IMMEDIATE) && (rhs.locationType == RESULT_LOCATION_IMMEDIATE))
-	{
-		result.locationType = RESULT_LOCATION_IMMEDIATE;
-		result.location.immediate = rhs.location.immediate + lhs.location.immediate;
-		return result;
-	}
 
-	RegisterGp savedRegisterLhs = -1;
-	Result tempLocationLhs = {1, 1, 1};
-	RegisterGp savedRegisterRhs = -1;
-	Result tempLocationRhs = { 1, 1, 1 };
+	RegisterGp savedRegisterLhs = REGISTER_ERROR;
+	Result tempLocationLhs = { 0, 0, 0};
 
 	if (lhs.locationType != RESULT_LOCATION_REGISTER_GP)
 	{
+		// Couldn't allocate register for lhs
 		if (moveToRegister(compiler, lhs, &lhs) == false)
 		{
-			savedRegisterLhs = 0;
+			// Take any register to move the value into
+			savedRegisterLhs = REGISTER_RAX;
+
+			// Move the value to a temp memory location
+			// Could later try moving it to the scratch register but I don't know if the rhs would need to use it
+			// The temp would still be needed for stornig the final result
 			tempLocationLhs = allocateTemp(compiler);
 			emitInstruction(compiler, "mov");
 			emitResultLocation(compiler, tempLocationLhs);
 			emitText(compiler, ", %s", RegisterGpToString(savedRegisterLhs, 8));
 
+			// Move lhs to register.
 			emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterLhs, DataTypeSize(lhs.dataType)));
 			emitResultLocation(compiler, lhs);
 			
@@ -221,54 +223,66 @@ static Result compileAddition(Compiler* compiler, Result lhs, Result rhs)
 			lhs.location.registerGp = savedRegisterLhs;
 		}
 	}
+
 	if (rhs.locationType != RESULT_LOCATION_REGISTER_GP)
 	{
 		if (moveToRegister(compiler, rhs, &rhs) == false)
 		{
-			for (int i = 0; i < REGISTER_GP_COUNT; i++)
-			{
-				if (i != savedRegisterLhs)
-				{
-					savedRegisterRhs = i;
-					break;
-				}
-			}
-			tempLocationRhs = allocateTemp(compiler);
-			emitInstruction(compiler, "mov");
-			emitResultLocation(compiler, tempLocationRhs);
-			emitText(compiler, ", %s", RegisterGpToString(savedRegisterRhs, 8));
-
-			emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterRhs, DataTypeSize(rhs.dataType)));
+			emitInstruction(compiler, "mov %s,", RegisterGpToString(REGISTER_GP_SCRATCH, DataTypeSize(rhs.dataType)));
 			emitResultLocation(compiler, rhs);
 
 			rhs.locationType = RESULT_LOCATION_REGISTER_GP;
-			rhs.location.registerGp = savedRegisterRhs;
+			rhs.location.registerGp = REGISTER_GP_SCRATCH;
 		}
 	}
 
-	emitInstruction(compiler, "add");
-	emitResultLocation(compiler, lhs);
-	emitText(compiler, "%s", ",");
-	emitResultLocation(compiler, rhs);
-	if (rhs.locationType == RESULT_LOCATION_REGISTER_GP && savedRegisterRhs == -1)
-		freeGpRegister(compiler, rhs.location.registerGp);
+	const char* op = "";
 
-	if (savedRegisterLhs != -1)
+	switch (operator)
 	{
-		Result resultTemp = allocateTemp(compiler);
-		emitInstruction(compiler, "mov", RegisterGpToString(savedRegisterLhs, 8));
-		emitResultLocation(compiler, resultTemp);
-		emitText(compiler, ", %s", RegisterGpToString(savedRegisterLhs, 8));
-
-		emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterLhs, 8));
-		emitResultLocation(compiler, tempLocationLhs);
-		lhs.locationType = RESULT_LOCATION_BASE_OFFSET;
+		case TOKEN_PLUS:       op = "add"; break;
+		case TOKEN_MINUS:      op = "sub"; break;
+		case TOKEN_AMPERSAND:  op = "and"; break;
+		case TOKEN_PIPE:       op = "or";  break;
+		case TOKEN_CIRCUMFLEX: op = "xor"; break;
+			
+		default:
+			ASSERT_NOT_REACHED();
+			break;
 	}
 
-	if (savedRegisterRhs != -1)
+	emitInstruction(compiler, op);
+	emitResultLocation(compiler, lhs);
+	emitText(compiler, ",");
+	emitResultLocation(compiler, rhs);
+
+	if ((rhs.locationType == RESULT_LOCATION_REGISTER_GP) && (rhs.location.registerGp != REGISTER_GP_SCRATCH))
 	{
-		emitInstruction(compiler, "mov %s,", RegisterGpToString(savedRegisterRhs, 8));
-		emitResultLocation(compiler, tempLocationRhs);
+		freeGpRegister(compiler, rhs.location.registerGp);
+	}
+
+	if (savedRegisterLhs != REGISTER_ERROR)
+	{
+
+		// Move the saved register to the sratch register
+		emitInstruction(compiler, "mov %s,", RegisterGpToString(REGISTER_GP_SCRATCH, SIZE_QWORD));
+		emitResultLocation(compiler, tempLocationLhs);
+
+		// Move lhs to the temp location
+		emitInstruction(compiler, "mov");
+		emitResultLocation(compiler, tempLocationLhs);
+		emitText(compiler, ", %s", RegisterGpToString(savedRegisterLhs, DataTypeSize(tempLocationLhs.dataType)));
+
+		// Move the previous value of the register back to it
+		emitInstruction(
+			compiler, "mov %s, %s",
+			RegisterGpToString(savedRegisterLhs, SIZE_QWORD),
+			RegisterGpToString(REGISTER_GP_SCRATCH, SIZE_QWORD)
+		);
+		
+		// Add location type temp the size of the temp might be larger that the data stored in it
+		lhs.locationType = RESULT_LOCATION_BASE_OFFSET;
+		lhs.location.baseOffset = tempLocationLhs.location.baseOffset;
 	}
 
 	return lhs;
@@ -298,6 +312,9 @@ static DataType binaryExpressionGetResultingType(DataType a, DataType b)
 
 	// Change this later
 	result.type = (DataTypeSize(a) > DataTypeSize(b)) ? a.type : b.type;
+
+	//result.type = DATA_TYPE_ERROR;
+
 	return result;
 }
 
@@ -309,18 +326,60 @@ static Result convertToType(Compiler* compiler, DataType type, Result value)
 	ASSERT_NOT_REACHED();
 }
 
-static Result compileExprBinary(Compiler* compiler, ExprBinary* expr)
+static Result evaluateConstantBinaryExpression(Compiler* compiler, const Result* lhs, const Result* rhs, Token operator)
+{
+	Result result;
+	result.dataType = lhs->dataType;
+	result.locationType = RESULT_LOCATION_IMMEDIATE;
+	
+	switch (rhs->dataType.type)
+	{
+		case DATA_TYPE_INT: 
+		{
+			switch (operator.type)
+			{
+			case TOKEN_PLUS: result.location.intImmediate = lhs->location.intImmediate + rhs->location.intImmediate; break;
+			case TOKEN_MINUS: result.location.intImmediate = lhs->location.intImmediate - rhs->location.intImmediate; break;
+
+			default:
+				errorAt(compiler, operator, "Invalid operands for binary operator %s", "later add type");
+				break;
+			}
+		}
+
+	}
+
+	return result;
+}
+
+static Result compileExprBinary(Compiler* compiler, const ExprBinary* expr)
 {
 	Result a = compileExpr(compiler, expr->left);
 	Result b = compileExpr(compiler, expr->right);
+
 	DataType resultingType = binaryExpressionGetResultingType(a.dataType, b.dataType);
+	if (resultingType.type == DATA_TYPE_ERROR)
+	{
+		// Don't know if anything else could cause conversion to fail
+		errorAt(compiler, expr->operator, "Invalid operator %.*s", expr->operator.text.length, expr->operator.text.chars);
+	}
+
 	Result lhs = convertToType(compiler, resultingType, a);
 	Result rhs = convertToType(compiler, resultingType, b);
 
-	switch (expr->operator)
+	if ((lhs.locationType == RESULT_LOCATION_IMMEDIATE) && (rhs.locationType == RESULT_LOCATION_IMMEDIATE))
+	{
+		return evaluateConstantBinaryExpression(compiler, &lhs, &rhs, expr->operator);
+	}
+
+	switch (expr->operator.type)
 	{
 		case TOKEN_PLUS:
-			return compileAddition(compiler, lhs, rhs);
+		case TOKEN_MINUS:
+		case TOKEN_AMPERSAND:
+		case TOKEN_PIPE:
+		case TOKEN_CIRCUMFLEX:
+			return compileSimpleIntBinaryExpression(compiler, lhs, rhs, expr->operator.type);
 
 		default:
 			ASSERT_NOT_REACHED();
@@ -360,8 +419,9 @@ static Result compileExpr(Compiler* compiler, Expr* expr)
 	}	
 }
 
-static void compileStmtExpression(Compiler* compiler, StmtExpression* stmt)
+static void compileStmtExpression(Compiler* compiler, const StmtExpression* stmt)
 {
+	freeGpRegisters(compiler);
 	compileExpr(compiler, stmt->expresssion);
 }
 
@@ -387,12 +447,30 @@ static void compileStmtVariableDeclaration(Compiler* compiler, StmtVariableDecla
 	////return result;
 }
 
-static void compileStmt(Compiler* compiler, Stmt* stmt)
+static void compileStmtReturn(Compiler* compiler, const StmtReturn* stmt)
+{
+	if (stmt->returnValue != NULL)
+	{
+		Result returnValue = compileExpr(compiler, stmt->returnValue);
+
+		if ((returnValue.locationType == RESULT_LOCATION_REGISTER_GP)
+	     && (returnValue.location.registerGp != REGISTER_RAX))
+		{
+			emitInstruction(compiler, "mov %s,", RegisterGpToString(REGISTER_RAX, DataTypeSize(returnValue.dataType)));
+			emitResultLocation(compiler, returnValue);
+		}
+	}
+	//emitInstruction(compiler, "ret");
+}
+
+static void compileStmt(Compiler* compiler, const Stmt* stmt)
 {
 	switch (stmt->type)
 	{
 		case STMT_EXPRESSION: compileStmtExpression(compiler, (StmtExpression*)stmt); break;
 		case STMT_VARIABLE_DECLARATION: compileStmtVariableDeclaration(compiler, (StmtVariableDeclaration*)stmt); break;
+		case STMT_RETURN: compileStmtReturn(compiler, (StmtReturn*)stmt); break;
+
 		default:
 			ASSERT_NOT_REACHED();
 			break;
@@ -400,10 +478,10 @@ static void compileStmt(Compiler* compiler, Stmt* stmt)
 }
 
 // Make it return a String object;
-void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast)
+String CompilerCompile(Compiler* compiler, const FileInfo* fileInfo, const StmtArray* ast)
 {
-	compiler->parser = parser;
-	compiler->output = StringCopy("");
+	compiler->fileInfo = fileInfo;
+	compiler->output = StringCopy("global _start\n_start:\n\tmov rbp, rsp");
 	compiler->stackAllocationSize = 0;
 	freeGpRegisters(compiler);
 
@@ -412,9 +490,9 @@ void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast)
 		compileStmt(compiler, ast->data[i]);
 	}
 
-	// Later the user should free the output
-	StringFree(&compiler->output);
+	emitInstruction(compiler, "mov rdi, rax");
+	emitInstruction(compiler, "mov rax, 60");
+	emitInstruction(compiler, "syscall");
 
-	//printf("%d", compiler->stackAllocationSize);
-	//puts(compiler->output.chars);
+	return compiler->output;
 }

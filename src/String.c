@@ -105,7 +105,7 @@ void StringAppendVaFormat(String* string, const char* format, va_list arguments)
 	va_copy(args, arguments);
 
 	int length = vsnprintf(NULL, 0, format, args);
-	char* buffer = malloc(length);
+	char* buffer = malloc(length + 1);
 	if (buffer == NULL)
 	{
 		fputs("Failed to reallocate string", stderr);
@@ -115,12 +115,13 @@ void StringAppendVaFormat(String* string, const char* format, va_list arguments)
 	vsprintf(buffer, format, args);
 
 	StringAppendLen(string, buffer, length);
+	free(buffer);
 }
 
 void StringAppendFormat(String* string, const char* format, ...)
 {
 	va_list args;
-	va_start(args, format);
+	va_start(args, format);	
 	StringAppendVaFormat(string, format, args);
 	va_end(args);
 }

@@ -149,7 +149,7 @@ void printExpr(Expr* expression, int depth)
 			ExprBinary* expr = (ExprBinary*)expression;
 			printf("(");
 			printExpr(expr->left, depth);
-			printTokenType(expr->operator);
+			printTokenType(expr->operator.type);
 			printExpr(expr->right, depth);
 			printf(")");
 			//printObjectStart(depth);

@@ -5,6 +5,8 @@
 #include "IntArray.h"
 #include "StringView.h"
 
+// Line numbers are counted from 0
+
 typedef enum
 {
 	TOKEN_NUMBER,
@@ -14,6 +16,8 @@ typedef enum
 	TOKEN_ASTERISK,
 	TOKEN_SLASH,
 	TOKEN_PERCENT,
+	TOKEN_AMPERSAND,
+	TOKEN_CIRCUMFLEX,
 	TOKEN_LESS_THAN,
 	TOKEN_LESS_THAN_EQUALS,
 	TOKEN_LESS_THAN_LESS_THAN,
@@ -39,34 +43,37 @@ typedef enum
 	TOKEN_IF,
 	TOKEN_INT,
 	TOKEN_DOUBLE,
-	TOKEN_DO
+	TOKEN_DO,
+
+	TOKEN_RETURN
 }  TokenType;
 
 typedef struct
 {
 	TokenType type;
 	StringView text;
-	int line;
+	size_t line;
 } Token;
 
 typedef struct
 {
 	const char* filename;
+	StringView source;
 	IntArray lineStartOffsets;
 } FileInfo;
 
 void FileInfoInit(FileInfo* fileInfo);
+// If line doesn't exist should it return a NULL string view
+// or should I just assert
+StringView FileInfoGetLine(const FileInfo* fileInfo, size_t lineNumber);
 void FileInfoFree(FileInfo* fileInfo);
 
 typedef struct
 {
-	int line;
+	size_t line;
 	int charInLine;
 
 	FileInfo* fileInfo;
-
-	/*IntArray lineStartOffsets;
-	const char* filename;*/
 
 	const char* dataStart;
 	const char* dataEnd;
@@ -75,8 +82,7 @@ typedef struct
 	const char* currentChar;
 } Scanner;
 
-//void ScannerInit(Scanner* scanner, const char* filename, const char* text, size_t length);
-void ScannerReset(Scanner* scanner, FileInfo* fileInfo, StringView source);
+void ScannerReset(Scanner* scanner, FileInfo* fileInfo);
 void ScannerInit(Scanner* scanner);
 void ScannerFree(Scanner* scanner);
 

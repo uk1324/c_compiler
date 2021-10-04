@@ -26,6 +26,16 @@ typedef enum
 	RESULT_LOCATION_IMMEDIATE,
 } ResultLocationType;
 
+typedef uint8_t byte;
+typedef uint16_t word;
+typedef uint32_t dword;
+typedef uint64_t qword;
+
+typedef uint8_t ubyte;
+typedef uint16_t uword;
+typedef uint32_t udword;
+typedef uint64_t uqword;
+
 
 typedef struct
 {
@@ -40,7 +50,8 @@ typedef struct
 		int label;
 		uint64_t immediate;
 		// Don't know if I should use int here
-		int intImmediate;
+
+		dword intImmediate;
 		double floatImmediate;
 	} location;
 } Result;
@@ -52,7 +63,7 @@ typedef struct
 	bool hadError;
 
 	// For line information
-	Parser* parser;
+	const FileInfo* fileInfo;
 	// Spit this form here later
 	struct
 	{
@@ -88,4 +99,4 @@ typedef struct
 
 void CompilerInit(Compiler* compiler);
 void CompilerFree(Compiler* compiler);
-void CompilerCompile(Compiler* compiler, Parser* parser, StmtArray* ast);
+String CompilerCompile(Compiler* compiler, const FileInfo* fileInfo, const StmtArray* ast);

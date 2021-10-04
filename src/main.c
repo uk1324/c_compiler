@@ -13,10 +13,17 @@
 // but this would need to allow the ast to call private compier functions
 // it would also be harder to add new functionality like pre compilation type checking or printing
 
+// Make compiler function taking Expr and Stmt const
+
+// Could use restrict pointers in copy functions
+
+// Could remove the compile in functions in compiler
+// Later I will use the visitor pattern so it doesn't matter that much
+
 int main(int argCount, char* args[])
 {
-	while (true)
-	{
+	/*while (true)
+	{*/
 		const char* filename = "src/test.txt";
 
 		String source = StringFromFile(filename);
@@ -31,7 +38,8 @@ int main(int argCount, char* args[])
 		if (parser.hadError)
 			return EXIT_FAILURE;
 
-		//CompilerCompile(&compiler, &parser, &ast);
+		String output = CompilerCompile(&compiler, &parser, &ast);
+		printf("%s", output.chars);
 
 		StringFree(&source);
 		ParserFree(&parser);
@@ -43,6 +51,6 @@ int main(int argCount, char* args[])
 		}
 		StmtArrayFree(&ast);
 
-	}
+	//}
 	return EXIT_SUCCESS;
 }
