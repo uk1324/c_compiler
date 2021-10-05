@@ -106,7 +106,7 @@ const char* TokenTypeToString(TokenType type)
 {
 	switch (type)
 	{
-		case TOKEN_NUMBER: return "TOKEN_NUMBER";
+		case TOKEN_INT_LITERAL: return "TOKEN_INT_LITERAL";
 		case TOKEN_PLUS: return "TOKEN_PLUS";
 		case TOKEN_MINUS: return "TOKEN_MINUS";
 		case TOKEN_ASTERISK: return "TOKEN_ASTERISK";
@@ -164,9 +164,9 @@ void printExpr(Expr* expression, int depth)
 
 		//case EXPR_IDENTIFIER;
 
-		case EXPR_INT_LITERAL:
+		case EXPR_NUMBER_LITERAL:
 		{
-			ExprIntLiteral* expr = (ExprIntLiteral*)expression;
+			ExprNumberLiteral* expr = (ExprNumberLiteral*)expression;
 			printf("%.*s", expr->literal.text.length, expr->literal.text.chars);
 			//printMemberSeparator();
 			break;

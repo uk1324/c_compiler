@@ -9,7 +9,9 @@
 
 typedef enum
 {
-	TOKEN_NUMBER,
+	// Don't know if it is a good idea make some many number tokens, but if number literal tokens
+	TOKEN_INT_LITERAL,
+	TOKEN_FLOAT_LITERAL,
 
 	TOKEN_PLUS,
 	TOKEN_MINUS,
@@ -41,8 +43,18 @@ typedef enum
 	TOKEN_IDENTIFIER,
 
 	TOKEN_IF,
+
+	TOKEN_CHAR,
+	TOKEN_SHORT,
 	TOKEN_INT,
+	TOKEN_LONG,
+
+	TOKEN_FLOAT,
 	TOKEN_DOUBLE,
+
+	TOKEN_SIGNED,
+	TOKEN_UNSIGNED,
+
 	TOKEN_DO,
 
 	TOKEN_RETURN

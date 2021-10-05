@@ -50,15 +50,20 @@ typedef struct
 		int label;
 		uint64_t immediate;
 		// Don't know if I should use int here
-
+		byte charImmediate;
+		word shortImmediate;
 		dword intImmediate;
+		qword longLongImmediate;
+
 		double floatImmediate;
 	} location;
 } Result;
 
 typedef struct
 {
-	String output;
+	// Rename this to code section
+	String textSection;
+	String dataSection;
 
 	bool hadError;
 
@@ -94,6 +99,7 @@ typedef struct
 	// Maybe rename to localVariables
 	LocalVariableTable locals;
 	size_t stackAllocationSize;
+	int labelCount;
 
 } Compiler;
 

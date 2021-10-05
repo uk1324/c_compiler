@@ -16,7 +16,7 @@ typedef enum
 {
 	EXPR_BINARY,
 	EXPR_UNARY,
-	EXPR_INT_LITERAL,
+	EXPR_NUMBER_LITERAL,
 	EXPR_GROUPING,
 	EXPR_IDENTIFIER
 } ExprType;
@@ -57,12 +57,15 @@ typedef struct
 	Token name;
 } ExprIdentifier;
 
+// Chars have type int
+
 // Maybe later add array literal and string
 typedef struct
 {
 	Expr expr;
 	Token literal;
-} ExprIntLiteral;
+	DataType type;
+} ExprNumberLiteral;
 
 typedef enum
 {

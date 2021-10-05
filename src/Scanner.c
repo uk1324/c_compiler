@@ -119,6 +119,8 @@ static bool isAtEnd(Scanner* scanner)
 
 static char peek(Scanner* scanner)
 {
+	// Maybe bring this back later
+	//ASSERT(isAtEnd(scanner) == false);
 	return *scanner->currentChar;
 }
 
@@ -211,27 +213,102 @@ static bool isDigit(char chr)
 	return (chr >= '0') && (chr <= '9');
 }
 
+static bool isHexDigit(char chr)
+{
+	return isDigit(chr) || ((chr >= 'a') && (chr <= 'z')) || ((chr >= 'A') && (chr <= 'Z'));
+}
+
+static bool isOctalDigit(char chr)
+{
+	return (chr >= '0') && (chr <= '7');
+}
+
 static bool isAlnum(char chr)
 {
 	return isAlpha(chr) || isDigit(chr);
 }
 
+// Validating the number in scanner and then parsing it in the parser is kind of stupid
+// but storing the number in token would be cumbersome.
 static Token number(Scanner* scanner)
 {
-	while ((isAtEnd(scanner) == false) && (isDigit(peek(scanner))))
-		advance(scanner);
-	return makeToken(scanner, TOKEN_NUMBER);
-}
+	bool isHex = false;
 
-static TokenType matchKeyword(Scanner* scanner, size_t offset, size_t restLength, const char* rest, TokenType type)
-{
-	if (((scanner->tokenStart + offset + restLength) < scanner->dataEnd)
-	 && (((size_t)(scanner->currentChar - scanner->tokenStart) == (offset + restLength)))
-	 && (memcmp(scanner->tokenStart + offset, rest, restLength) == 0))
+	if (match(scanner, '0'))
 	{
-		return type;
+		if ((isAtEnd(scanner) == false) && (match(scanner, 'x') || match(scanner, 'X')))
+		{
+			isHex = true;
+			while ((isAtEnd(scanner) == false) && (isHexDigit(peek(scanner))))
+				advance(scanner);
+		}
+		else
+		{
+			while ((isAtEnd(scanner) == false) && (isOctalDigit(peek(scanner))))
+				advance(scanner);
+		}
 	}
-	return TOKEN_IDENTIFIER;
+	else
+	{
+		while ((isAtEnd(scanner) == false) && (isDigit(peek(scanner))))
+			advance(scanner);
+	}
+
+	bool isFloat = false;
+
+	// Priror to c99 hexiadecimal constant were not allowed put they require special syntax.
+	// 0x1.2p3; // hex fraction 1.2 (decimal 1.125) scaled by 2^3, that is 9.0
+	// If the float constant starts with a zero they zeros are ignored so
+	// there doesn't need to be a special case for octal literals
+	if ((isAtEnd(scanner) == false) && match(scanner, '.'))
+	{
+		if (isHex)
+		{
+			error(scanner, "hexadecimal floating point constants are not allowed");
+			return errorToken();
+		}
+
+		isFloat = true;
+
+		while ((isAtEnd(scanner) == false) && (isDigit(peek(scanner))))
+			advance(scanner);
+	}
+
+	if ((isAtEnd(scanner) == false) && (match(scanner, 'e') || match(scanner, 'E')))
+	{
+		isFloat = true;
+
+		match(scanner, '-') || match(scanner, '+');
+
+		while ((isAtEnd(scanner) == false) && (isDigit(peek(scanner))))
+			advance(scanner);
+	}
+
+	// Don't know if the suffix should be a saparate token or not.
+	// I could also make a token for each literal type but that would make 9 tokens for numbers
+
+	if (isFloat && (isAtEnd(scanner) == false))
+	{
+		(match(scanner, 'f') || match(scanner, 'F')) || ((match(scanner, 'l') || match(scanner, 'L')));
+
+		return makeToken(scanner, TOKEN_FLOAT_LITERAL);
+	}
+	else
+	{
+		match(scanner, 'u') || match(scanner, 'U');
+
+		if ((isAtEnd(scanner) == false) && match(scanner, 'l'))
+		{
+			match(scanner, 'l');
+		}
+		else if ((isAtEnd(scanner) == false) && match(scanner, 'L'))
+		{
+			match(scanner, 'L');
+		}
+
+		return makeToken(scanner, TOKEN_INT_LITERAL);
+	}
+
 }
 
 static Token identifierOrKeyword(Scanner* scanner)
@@ -272,6 +349,22 @@ static Token identifierOrKeyword(Scanner* scanner)
 			KEYWORD("int", TOKEN_INT)
 		KEYWORD_GROUP_END()
 
+		KEYWORD_GROUP('f')
+			KEYWORD("float", TOKEN_FLOAT)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('l')
+			KEYWORD("long", TOKEN_LONG)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('s')
+			KEYWORD("signed", TOKEN_SIGNED)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('u')
+			KEYWORD("unsigned", TOKEN_UNSIGNED);
+		KEYWORD_GROUP_END()
+
 		KEYWORD_GROUP('r')
 			KEYWORD("return", TOKEN_RETURN)
 		KEYWORD_GROUP_END()
@@ -287,8 +380,13 @@ static Token identifierOrKeyword(Scanner* scanner)
 
 static Token scanToken(Scanner* scanner)
 {
-	skipWhitespace(scanner);
+	if (isAtEnd(scanner))
+	{
+		return makeToken(scanner, TOKEN_EOF);
+	}
 
+	skipWhitespace(scanner);
+	
 	if (isAtEnd(scanner))
 	{
 		return makeToken(scanner, TOKEN_EOF);

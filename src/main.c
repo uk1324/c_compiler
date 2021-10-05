@@ -38,7 +38,7 @@ int main(int argCount, char* args[])
 		if (parser.hadError)
 			return EXIT_FAILURE;
 
-		String output = CompilerCompile(&compiler, &parser, &ast);
+		String output = CompilerCompile(&compiler, &fileInfo, &ast);
 		printf("%s", output.chars);
 
 		StringFree(&source);

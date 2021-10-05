@@ -37,7 +37,7 @@ void ExprFree(Expr* expression)
 			ExprFree(((ExprGrouping*)expression)->expression);
 			break;
 
-		case EXPR_INT_LITERAL:
+		case EXPR_NUMBER_LITERAL:
 			break;
 			
 		case EXPR_IDENTIFIER:

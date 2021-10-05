@@ -49,7 +49,7 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 	//	: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
 
 	//int offsetInLine = (token->text.chars - parser->scanner.dataStart) - lineStartOffsets->data[line - 1];
-
+	fprintf(stderr, "%s\n", message);
 	//fprintf(
 	//	stderr,
 	//	"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
@@ -118,25 +118,160 @@ static DataType dataType(Parser* parser)
 {
 	DataType type;
 
-	if (match(parser, TOKEN_INT))
+	// To make things like unsigned a; possible
+	bool isSignednessSpecified = false;
+
+	if (match(parser, TOKEN_UNSIGNED))
 	{
-		type.type = DATA_TYPE_INT;
+		isSignednessSpecified = true;
+		type.isUnsigned = true;
+	}
+	else
+	{
+		if (match(parser, TOKEN_SIGNED))
+			isSignednessSpecified = true;
 		type.isUnsigned = false;
 	}
+
+	if (match(parser, TOKEN_LONG))
+	{
+		if (match(parser, TOKEN_DOUBLE))
+		{
+			if (isSignednessSpecified)
+			{
+				error(parser, "cannot use a signedness specifier with long double");
+				type.type = DATA_TYPE_ERROR;
+				return type;
+			}
+			type.type = DATA_TYPE_LONG_DOUBLE;
+		}
+
+		if (match(parser, TOKEN_LONG))
+		{
+			match(parser, TOKEN_INT);
+			type.type = DATA_TYPE_LONG_LONG;
+		}
+
+		type.type = DATA_TYPE_LONG;
+	}
+	else if (match(parser, TOKEN_SHORT))
+	{
+		match(parser, TOKEN_INT);
+		type.type = DATA_TYPE_SHORT;
+	}
+	else if (match(parser, TOKEN_INT) || isSignednessSpecified)
+	{
+		type.type = DATA_TYPE_INT;
+	}
+	else if (match(parser, TOKEN_DOUBLE))
+	{
+		if (isSignednessSpecified)
+		{
+			error(parser, "cannot use a signedness specifier with double");
+			type.type = DATA_TYPE_ERROR;
+			return type;
+		}
+		type.type = DATA_TYPE_DOUBLE;
+	}
+	else if (match(parser, TOKEN_FLOAT))
+	{
+		if (isSignednessSpecified)
+		{
+			error(parser, "cannot use a signedness specifier with float");
+			type.type = DATA_TYPE_ERROR;
+			return type;
+		}
+		type.type = DATA_TYPE_FLOAT;
+	}
+
+	// Could return from some function sooner to make it less complex like moving the float function to the top
+	// but the problem is more complex types like pointers but i might move that to another function.
 
 	return type;
 }
 
 static Expr* expression(Parser* parser);
 
+static Expr* intLiteral(Parser* parser)
+{
+	ExprNumberLiteral* expr = (ExprNumberLiteral*)ExprAllocate(sizeof(ExprNumberLiteral), EXPR_NUMBER_LITERAL);
+	expr->literal = parser->previous;
+
+	StringView token = parser->previous.text;
+	const char* tokenStart = token.chars;
+	const char* current = token.chars + token.length - 1;
+
+	expr->type.isUnsigned = false;
+	expr->type.type = DATA_TYPE_INT;
+
+	if (*current == 'l')
+	{
+		current--;
+		if ((current > tokenStart) && (*current == 'l'))
+		{
+			expr->type.type = DATA_TYPE_LONG_LONG;
+		}
+		else
+		{
+			expr->type.type = DATA_TYPE_LONG;
+		}
+		current--;
+	}
+
+	if (*current == 'L')
+	{
+		current--;
+		if ((current > tokenStart) && (*current == 'L'))
+		{
+			expr->type.type = DATA_TYPE_LONG_LONG;
+		}
+		else
+		{
+			expr->type.type = DATA_TYPE_LONG;
+		}
+		current--;
+	}
+
+	if ((current > tokenStart) && ((*current == 'U') || (*current == 'u')))
+	{
+		expr->type.isUnsigned = true;
+	}
+
+	return (Expr*)expr;
+}
+
+static Expr* floatLiteral(Parser* parser)
+{
+	ExprNumberLiteral* expr = (ExprNumberLiteral*)ExprAllocate(sizeof(ExprNumberLiteral), EXPR_NUMBER_LITERAL);
+	expr->literal = parser->previous;
+
+	StringView token = parser->previous.text;
+	const char* current = token.chars + token.length - 1;
+
+	expr->type.type = DATA_TYPE_DOUBLE;
+
+	if ((*current == 'l') || (*current == 'L'))
+	{
+		expr->type.type = DATA_TYPE_LONG_DOUBLE;
+	}
+
+	if ((*current == 'f') || (*current == 'F'))
+	{
+		expr->type.type = DATA_TYPE_FLOAT;
+	}
+
+	return (Expr*)expr;
+}
+
 static Expr* literal(Parser* parser)
 {
-	if (match(parser, TOKEN_NUMBER))
+	if (match(parser, TOKEN_INT_LITERAL))
 	{
-		ExprIntLiteral* expr = (ExprIntLiteral*)ExprAllocate(sizeof(ExprIntLiteral), EXPR_INT_LITERAL);
-		expr->literal = parser->previous;
-		
-		return (Expr*)expr;
+		return intLiteral(parser);
+	}
+	else if (match(parser, TOKEN_FLOAT_LITERAL))
+	{
+		return floatLiteral(parser);
 	}
 	else if (match(parser, TOKEN_IDENTIFIER))
 	{
@@ -263,9 +398,20 @@ static Stmt* returnStatement(Parser* parser)
 	return (Stmt*)stmt;
 }
 
+bool isDataTypeStart(Parser* parser)
+{
+	return check(parser, TOKEN_INT)
+		|| check(parser, TOKEN_SHORT)
+		|| check(parser, TOKEN_LONG)
+		|| check(parser, TOKEN_SIGNED)
+		|| check(parser, TOKEN_UNSIGNED)
+		|| check(parser, TOKEN_FLOAT)
+		|| check(parser, TOKEN_DOUBLE);
+}
+
 static Stmt* statement(Parser* parser)
 {
-	if (check(parser, TOKEN_INT))
+	if (isDataTypeStart(parser))
 		return variableDeclaration(parser);
 	else if (match(parser, TOKEN_RETURN))
 		return returnStatement(parser);
