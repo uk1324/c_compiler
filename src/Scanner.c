@@ -359,6 +359,7 @@ static Token identifierOrKeyword(Scanner* scanner)
 
 		KEYWORD_GROUP('s')
 			KEYWORD("signed", TOKEN_SIGNED)
+			KEYWORD("short", TOKEN_SHORT)
 		KEYWORD_GROUP_END()
 
 		KEYWORD_GROUP('u')

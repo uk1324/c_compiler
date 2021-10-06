@@ -1,8 +1,10 @@
-int x = 1;
-int y = 2;
-int z = 6;
-int a = 3;
-int b = 4;
-int c = 5;
+short x = 1;
+short y = 2;
+short z = 6;
+short a = 3;
+short b = 4;
+short c = 5;
 
-return c + (x + y) + ((a - b) + ((a + b) + (z - x)));
+return a + 2;
+
+//return c + (x + y) + ((a - b) + ((a + 3) + (z - 5)));

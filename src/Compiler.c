@@ -140,10 +140,48 @@ static void emitResultLocation(Compiler* compiler, Result result)
 static void emitTwoOperandInstruction(Compiler* compiler, const char* op, const Result* a, const Result* b)
 {
 	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
-	ASSERT(a->dataType.type == b->dataType.type);
 	emitResultLocation(compiler, *a);
 	emitText(compiler, ",");
 	emitResultLocation(compiler, *b);
+}
+
+static void emitInstructionOperandTemp(Compiler* compiler, const char* op, const Result* operand, const Result* temp)
+{
+	Result tmp = *temp;
+	tmp.dataType = operand->dataType;
+	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
+	emitResultLocation(compiler, *operand);
+	emitText(compiler, ",");
+	emitResultLocation(compiler, tmp);
+}
+
+static void emitInstructionTempOperand(Compiler* compiler, const char* op, const Result* temp, const Result* operand)
+{
+	Result tmp = *temp;
+	tmp.dataType = operand->dataType;
+	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
+	emitResultLocation(compiler, tmp);
+	emitText(compiler, ",");
+	emitResultLocation(compiler, *operand);
+}
+
+static DataType sizeToDataType(size_t size)
+{
+	DataType dataType;
+
+	switch (size)
+	{
+		case 1: dataType.type = DATA_TYPE_CHAR; break;
+		case 2: dataType.type = DATA_TYPE_SHORT; break;
+		case 4: dataType.type = DATA_TYPE_INT; break;
+		case 8: dataType.type = DATA_TYPE_LONG_LONG; break;
+
+	default:
+		ASSERT_NOT_REACHED();
+		break;
+	}
+
+	return dataType;
 }
 
 static Result ResultFromRegisterGp(RegisterGp reg, size_t size)
@@ -151,18 +189,8 @@ static Result ResultFromRegisterGp(RegisterGp reg, size_t size)
 	Result result;
 	result.locationType = RESULT_LOCATION_REGISTER_GP;
 	result.location.registerGp = reg;
+	result.dataType = sizeToDataType(size);
 
-	switch (size)
-	{
-	case 1: result.dataType.type = DATA_TYPE_CHAR; break;
-	case 2: result.dataType.type = DATA_TYPE_SHORT; break;
-	case 4: result.dataType.type = DATA_TYPE_INT; break;
-	case 8: result.dataType.type = DATA_TYPE_LONG_LONG; break;
-
-	default:
-		ASSERT_NOT_REACHED();
-		break;
-	}
 	return result;
 }
 
@@ -257,13 +285,13 @@ static bool moveToRegister(Compiler* compiler, Result value, Result* result)
 	return true;
 }
 
-Result allocateTemp(Compiler* compiler)
+Result allocateTemp(Compiler* compiler, size_t size)
 {
 	Result temp;
 	// Don't know the size of temp so just use QWORD
-	temp.location.baseOffset = allocateSingleVariableOnStack(compiler, 8);
+	temp.location.baseOffset = allocateSingleVariableOnStack(compiler, size);
 	temp.locationType = RESULT_LOCATION_BASE_OFFSET;
-	temp.dataType.type = DATA_TYPE_LONG;
+	temp.dataType = sizeToDataType(size);
 	return temp;
 }
 
@@ -289,11 +317,12 @@ static Result compileSimpleIntBinaryExpression(Compiler* compiler, Result lhs, R
 			savedRegisterLhs = ResultFromRegisterGp(REGISTER_RAX, SIZE_QWORD);
 
 			// Move the value to a temp memory location
-			tempLocationLhs = allocateTemp(compiler);
+			tempLocationLhs = allocateTemp(compiler, SIZE_QWORD);
 			emitTwoOperandInstruction(compiler, "mov", &tempLocationLhs, &savedRegisterLhs);
 
 			// Move lhs to register.
-			emitTwoOperandInstruction(compiler, "mov", &savedRegisterLhs, &lhs);
+			//emitTwoOperandInstruction(compiler, "mov", &savedRegisterLhs, &lhs);
+			emitInstructionTempOperand(compiler, "mov", &savedRegisterLhs, &lhs);
 			
 			lhs.locationType = RESULT_LOCATION_REGISTER_GP;
 			lhs.location.registerGp = savedRegisterLhs.location.registerGp;
@@ -340,7 +369,6 @@ static Result compileSimpleIntBinaryExpression(Compiler* compiler, Result lhs, R
 		// Move the saved register to the sratch register
 		emitTwoOperandInstruction(compiler, "mov", &scratchRegister, &tempLocationLhs);
 
-		savedRegisterLhs.dataType = tempLocationLhs.dataType;
 		// Move lhs to the temp location
 		emitTwoOperandInstruction(compiler, "mov", &tempLocationLhs, &savedRegisterLhs);
 
@@ -508,10 +536,43 @@ static Result convertToType(Compiler* compiler, const DataType* type, const Resu
 	if (value->dataType.type == type->type)
 		return *value;
 
+	Result result;
+
+	// Long and int are the same size
+	size_t aSize = DataTypeSize(*type);
+	size_t bSize = DataTypeSize(value->dataType);
+
+	// If the resulting size is smaller just take the lower part of the bigger type
+	if (aSize <= bSize)
+	{
+		result = *value;
+		result.dataType = *type;
+		return result;
+	}
+
 	if (DataTypeIsInt(&value->dataType) && value->locationType == RESULT_LOCATION_IMMEDIATE)
 	{
 		return convertImmediate(compiler, type, value);
 	}
+
+	if (DataTypeIsInt(type) && DataTypeIsInt(&value->dataType))
+	{
+		Result reg;
+		if (value->locationType == RESULT_LOCATION_REGISTER_GP)
+		{
+			Result scratchRegister = ResultFromRegisterGp(REGISTER_GP_SCRATCH, )
+			emitTwoOperandInstruction(compiler, )
+		}
+	}
+
+	//if (DataTypeIsFloat(type))
+	//{
+	//	Result reg;
+	//	if (value->locationType == RESULT_LOCATION_REGISTER_GP)
+	//	{
+
+	//	}
+	//}
 
 	ASSERT_NOT_REACHED();
 }

@@ -20,6 +20,15 @@
 // Could remove the compile in functions in compiler
 // Later I will use the visitor pattern so it doesn't matter that much
 
+// Could simplify and make long and int the same type
+
+// emitInstructionTempOprand
+// emitInstructionOperandTemp
+// or maybe move
+// the temp takes the size of the operand
+
+// Result location temp baseOffset and size
+
 int main(int argCount, char* args[])
 {
 	/*while (true)
