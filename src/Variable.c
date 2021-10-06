@@ -31,11 +31,11 @@ static void setStringViewNull(StringView* view)
 
 TABLE_TEMPLATE_DEFINITION(LocalVariableTable, StringView, LocalVariable, StringViewHash, copyStringView, compareStringView, NO_OP_FUNCTION, copyLocalVariable, NO_OP_FUNCTION, isStringViewNull, setStringViewNull)
 
-size_t DataTypeSize(DataType type)
+size_t DataTypeSize(const DataType* type)
 {
 	
 	// Add if for struct
-	switch (type.type)
+	switch (type->type)
 	{
 		case DATA_TYPE_CHAR:	   return SIZE_BYTE;
 		case DATA_TYPE_SHORT:	   return SIZE_WORD;

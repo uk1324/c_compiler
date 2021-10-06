@@ -35,7 +35,7 @@ typedef struct
 	//} as;
 } DataType;
 
-size_t DataTypeSize(DataType type);
+size_t DataTypeSize(const DataType* type);
 bool DataTypeIsFloat(const DataType* type);
 bool DataTypeIsInt(const DataType* type);
 

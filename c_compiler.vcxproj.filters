@@ -48,9 +48,6 @@
     <ClCompile Include="src\StringView.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Json.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Registers.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -102,9 +99,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\StringView.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Json.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Registers.h">

@@ -27,6 +27,7 @@ typedef struct
 } Expr;
 
 Expr* ExprAllocate(size_t size, ExprType type);
+#define EXPR_ALLOCATE(dataType, exprType) ((dataType*)StmtAllocate(sizeof(dataType), exprType))
 void ExprFree(Expr* expression);
 
 typedef struct
@@ -64,7 +65,7 @@ typedef struct
 {
 	Expr expr;
 	Token literal;
-	DataType type;
+	DataType dataType;
 } ExprNumberLiteral;
 
 typedef enum
@@ -82,6 +83,7 @@ typedef struct
 ARRAY_TEMPLATE_DECLARATION(StmtArray, Stmt*)
 
 Stmt* StmtAllocate(size_t size, StmtType type);
+#define STMT_ALLOCATE(dataType, stmtType) ((dataType*)StmtAllocate(sizeof(dataType), stmtType))
 void StmtFree(Stmt* statement);
 
 typedef struct

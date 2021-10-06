@@ -2,15 +2,10 @@
 
 #include <stddef.h>
 
-#define REGISTER_GP_COUNT 3
-#define REGISTER_SIMD_COUNT 8
-
 #define SIZE_QWORD 8
 #define SIZE_DWORD 4
 #define SIZE_WORD 2
 #define SIZE_BYTE 1
-
-#define REGISTER_ERROR -1
 
 // General purpose registers
 typedef enum
@@ -31,12 +26,8 @@ typedef enum
 	REGISTER_R13,
 	REGISTER_R14,
 	REGISTER_R15,
+	REGISTER_GP_COUNT
 } RegisterGp;
-
-// Scratch register shouldn't be used to store results.
-// It is used to move temporaries.
-// Not sure yet but it might be used as for storing the rhs of simple binary expressions.
-#define REGISTER_GP_SCRATCH REGISTER_R12
 
 typedef enum
 {
@@ -47,7 +38,8 @@ typedef enum
 	REGISTER_XMM4,
 	REGISTER_XMM5,
 	REGISTER_XMM6,
-	REGISTER_XMM7
+	REGISTER_XMM7,
+	REGISTER_SIMD_COUNT
 } RegisterSimd;
 
 const char* RegisterGpToString(RegisterGp reg, size_t registerSize);

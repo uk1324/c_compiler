@@ -1,10 +1,1 @@
-short x = 1;
-short y = 2;
-short z = 6;
-short a = 3;
-short b = 4;
-short c = 5;
-
-return a + 2;
-
-//return c + (x + y) + ((a - b) + ((a + 3) + (z - 5)));
+return 3 - 1;

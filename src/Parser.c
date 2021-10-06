@@ -1,21 +1,41 @@
 #include "Parser.h"
 #include "TerminalColors.h" 
 #include "Variable.h"
+#include "Assert.h"
+
+static void advance(Parser* parser);
+static bool isAtEnd(Parser* parser);
+static void errorAt(Parser* parser, Token* token, const char* message);
+static void error(Parser* parser, const char* message);
+static Token peek(Parser* parser);
+static bool check(Parser* parser, TokenType type);
+static bool match(Parser* parser, TokenType type);
+static void consume(Parser* parser, TokenType type, const char* errorMessage);
+
+static Stmt* expressionStatement(Parser* parser);
+static Stmt* variableDeclaration(Parser* parser);
+static Stmt* returnStatement(Parser* parser);
+
+bool isDataTypeStart(Parser* parser);
+static Stmt* statement(Parser* parser);
+
+static DataType dataType(Parser* parser);
+static Expr* literal(Parser* parser);
+static Expr* grouping(Parser* parser);
+static Expr* unary(Parser* parser);
+static Expr* term(Parser* parser);
+static Expr* factor(Parser* parser);
+static Expr* expression(Parser* parser);
 
 void ParserInit(Parser* parser)
 {
 	ScannerInit(&parser->scanner);
-	//parser->scanner = scanner;
-	//parser->current = ScannerNextToken(scanner);
 }
 
 void ParserFree(Parser* parser)
 {
 	ScannerFree(&parser->scanner);
 }
-
-static void advance(Parser* parser);
-static bool isAtEnd(Parser* parser);
 
 static void synchornize(Parser* parser)
 {
@@ -26,13 +46,12 @@ static void synchornize(Parser* parser)
 		switch (parser->current.type)
 		{
 			case TOKEN_INT:
-			case TOKEN_SEMICOLON:
+			case TOKEN_SEMICOLON:	
 				return;
 		}
 	}
 }
 
-// Add fmt if needed later
 static void errorAt(Parser* parser, Token* token, const char* message)
 {
 	if (parser->isSynchronizing)
@@ -40,32 +59,11 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 	parser->hadError = true;
 	parser->isSynchronizing = true;
 
-	// The lines could not be fully scanned yet so this code is probaby garbage
-
-	//size_t line = (size_t)token->line;
-	//IntArray* lineStartOffsets = &parser->scanner.fileInfo->lineStartOffsets;
-	//int lineLength = (line == lineStartOffsets->size)
-	//	? parser->scanner.dataEnd - (parser->scanner.dataStart - lineStartOffsets->data[line - 1])
-	//	: lineStartOffsets->data[line] - lineStartOffsets->data[line - 1];
-
-	//int offsetInLine = (token->text.chars - parser->scanner.dataStart) - lineStartOffsets->data[line - 1];
 	fprintf(stderr, "%s\n", message);
-	//fprintf(
-	//	stderr,
-	//	"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
-	//	"\n%.*s\n"
-	//	"%*s" TERM_COL_GREEN "^%*s" TERM_COL_RESET "\n",
-	//	parser->scanner.fileInfo->filename, line, offsetInLine, message,
-	//	lineLength,
-	//	&parser->scanner.dataStart[parser->scanner.fileInfo->lineStartOffsets.data[line - 1]],
-	//	offsetInLine, " ",
-	//	token->text.length - 1, "~"
-	//);
 }
 
 static void error(Parser* parser, const char* message)
 {
-	// Later add support for scanner errors
 	errorAt(parser, &parser->current, message);
 }
 
@@ -192,86 +190,64 @@ static DataType dataType(Parser* parser)
 
 static Expr* expression(Parser* parser);
 
-static Expr* intLiteral(Parser* parser)
+// Finding the data type in parsing is kindof pointless because the compiler has to switch between the types anyway.
+// It does simplify things like char literals though.
+static DataType tokenNumberLiteralToDataType(TokenType token)
 {
-	ExprNumberLiteral* expr = (ExprNumberLiteral*)ExprAllocate(sizeof(ExprNumberLiteral), EXPR_NUMBER_LITERAL);
-	expr->literal = parser->previous;
+	DataType type;
 
-	StringView token = parser->previous.text;
-	const char* tokenStart = token.chars;
-	const char* current = token.chars + token.length - 1;
-
-	expr->type.isUnsigned = false;
-	expr->type.type = DATA_TYPE_INT;
-
-	if (*current == 'l')
+	switch (token)
 	{
-		current--;
-		if ((current > tokenStart) && (*current == 'l'))
-		{
-			expr->type.type = DATA_TYPE_LONG_LONG;
-		}
-		else
-		{
-			expr->type.type = DATA_TYPE_LONG;
-		}
-		current--;
+		case TOKEN_INT_LITERAL:
+			type.isUnsigned = false;
+			type.type = DATA_TYPE_INT;
+			break;
+		case TOKEN_UNSIGNED_INT_LITERAL:
+			type.isUnsigned = true;
+			type.type = DATA_TYPE_INT;
+			break;
+		case TOKEN_LONG_LITERAL:
+			type.isUnsigned = false;
+			type.type = DATA_TYPE_LONG;
+			break;
+		case TOKEN_UNSIGNED_LONG_LITERAL:
+			type.isUnsigned = true;
+			type.type = DATA_TYPE_LONG;
+			break;
+		case TOKEN_LONG_LONG_LITERAL:
+			type.isUnsigned = false;
+			type.type = DATA_TYPE_LONG_LONG;
+			break;
+		case TOKEN_UNSIGNED_LONG_LONG_LITERAL:
+			type.isUnsigned = true;
+			type.type = DATA_TYPE_LONG_LONG;
+			break;
+		case TOKEN_FLOAT_LITERAL:
+			type.type = DATA_TYPE_FLOAT;
+			break;
+		case TOKEN_DOUBLE_LITERAL:
+			type.type = DATA_TYPE_DOUBLE;
+			break;
+		case TOKEN_LONG_DOUBLE_LITERAL:
+			type.type = DATA_TYPE_FLOAT;
+			break;
+		default:
+			type.type = DATA_TYPE_ERROR;
 	}
 
-	if (*current == 'L')
-	{
-		current--;
-		if ((current > tokenStart) && (*current == 'L'))
-		{
-			expr->type.type = DATA_TYPE_LONG_LONG;
-		}
-		else
-		{
-			expr->type.type = DATA_TYPE_LONG;
-		}
-		current--;
-	}
-
-	if ((current > tokenStart) && ((*current == 'U') || (*current == 'u')))
-	{
-		expr->type.isUnsigned = true;
-	}
-
-	return (Expr*)expr;
-}
-
-static Expr* floatLiteral(Parser* parser)
-{
-	ExprNumberLiteral* expr = (ExprNumberLiteral*)ExprAllocate(sizeof(ExprNumberLiteral), EXPR_NUMBER_LITERAL);
-	expr->literal = parser->previous;
-
-	StringView token = parser->previous.text;
-	const char* current = token.chars + token.length - 1;
-
-	expr->type.type = DATA_TYPE_DOUBLE;
-
-	if ((*current == 'l') || (*current == 'L'))
-	{
-		expr->type.type = DATA_TYPE_LONG_DOUBLE;
-	}
-
-	if ((*current == 'f') || (*current == 'F'))
-	{
-		expr->type.type = DATA_TYPE_FLOAT;
-	}
-
-	return (Expr*)expr;
+	return type;
 }
 
 static Expr* literal(Parser* parser)
 {
-	if (match(parser, TOKEN_INT_LITERAL))
+	DataType dataType = tokenNumberLiteralToDataType(peek(parser).type);
+	if (dataType.type != DATA_TYPE_ERROR)
 	{
-		return intLiteral(parser);
-	}
-	else if (match(parser, TOKEN_FLOAT_LITERAL))
-	{
-		return floatLiteral(parser);
+		advance(parser);
+		ExprNumberLiteral* expr = EXPR_ALLOCATE(ExprNumberLiteral, EXPR_NUMBER_LITERAL);
+		expr->dataType = dataType;
+		expr->literal = parser->previous;
+		return (Expr*)expr;
 	}
 	else if (match(parser, TOKEN_IDENTIFIER))
 	{
@@ -349,10 +325,6 @@ static Expr* expression(Parser* parser)
 	return factor(parser);
 }
 
-//static StmtList* 
-
-//#include "AstPrinter.h"
-
 static Stmt* expressionStatement(Parser* parser)
 {
 	StmtExpression* expressionStmt = (StmtExpression*)StmtAllocate(sizeof(StmtExpression), STMT_EXPRESSION);
@@ -419,19 +391,19 @@ static Stmt* statement(Parser* parser)
 		return expressionStatement(parser);
 }
 
+static Stmt* declaration(Parser* parser)
+{
+
+}
+
 StmtArray ParserParse(Parser* parser, const char* filename, StringView source, FileInfo* fileInfoToFillOut)
 {
 	parser->hadError = false;
 	parser->isSynchronizing = false;
 
-
 	fileInfoToFillOut->source = source;
 	fileInfoToFillOut->filename = filename;
-	ScannerReset(&parser->scanner, fileInfoToFillOut, source);
-	//parser->scanner.fileInfo = fileInfoToFillOut;
-	//parser->scanner.fileInfo->filename = filename;
-	//parser->scanner.fileInfo->source = source;
-
+	ScannerReset(&parser->scanner, fileInfoToFillOut);
 	parser->current = ScannerNextToken(&parser->scanner);
 
 	StmtArray array;

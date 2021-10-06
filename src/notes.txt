@@ -33,3 +33,6 @@ use of a type. In higher level languages like javascript name binding could be d
 
 An optimizing compiler might benefit from time checking because it knows the resulting type of an expression
 and can optimize it better for example using the floating point registers for things like (a < b) + 2.0
+
+It is probably better to scan the whole file before starting parsing.
+This simplifies parsing of things like literal suffixes.

@@ -17,13 +17,21 @@
 // https://en.wikipedia.org/wiki/C11_(C_standard_revision)
 // Maybe use _Generic instead of align macro
 
+typedef struct
+{
+	size_t baseOffset;
+	size_t size;
+	bool isAllocated;
+} Temp;
+
+ARRAY_TEMPLATE_DECLARATION(TempArray, Temp)
+
 typedef enum
 {
-	RESULT_LOCATION_REGISTER_GP,
-	RESULT_LOCATION_REGISTER_SIMD,
 	RESULT_LOCATION_BASE_OFFSET,
+	RESULT_LOCATION_TEMP,
 	RESULT_LOCATION_LABEL,
-	RESULT_LOCATION_IMMEDIATE,
+	RESULT_LOCATION_INT_CONSTANT,
 } ResultLocationType;
 
 typedef uint8_t byte;
@@ -36,7 +44,9 @@ typedef uint16_t uword;
 typedef uint32_t udword;
 typedef uint64_t uqword;
 
-
+// Later add system for allocating and freeing temps
+// Maybe store the location in an array of temp objects
+// It would store the size and location of temp
 typedef struct
 {
 	ResultLocationType locationType;
@@ -44,24 +54,26 @@ typedef struct
 
 	union
 	{
-		RegisterGp registerGp;
-		RegisterSimd registerSimd;
+		// Used if RESULT_LOCATION_BASE_OFFSET
 		uintptr_t baseOffset;
-		int label;
-		uint64_t immediate;
-		// Don't know if I should use int here
-		byte charImmediate;
-		word shortImmediate;
-		dword intImmediate;
-		qword longLongImmediate;
 
-		double floatImmediate;
+		// Used if RESUL_LOCATION_TEMP
+		int tempIndex;
+
+		// Used if RESULT_LOCATION_LABEL
+		size_t labelIndex;
+
+		// Used if RESULT_LOCATION_CONSTANT
+		uint64_t constant;
+		byte charConstant;
+		word shortConstant;
+		dword intConstant;
+		qword longLongConstant;
 	} location;
 } Result;
 
 typedef struct
 {
-	// Rename this to code section
 	String textSection;
 	String dataSection;
 
@@ -69,36 +81,12 @@ typedef struct
 
 	// For line information
 	const FileInfo* fileInfo;
-	// Spit this form here later
-	struct
-	{
-		union
-		{
-			bool array[REGISTER_GP_COUNT];
-			struct
-			{
-				bool rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
-					 r8,  r9,  r10, r11, r12, r13, r14, r15;
-			} registerGp;
-		} as;
-	} isRegisterGpAllocated;
 
-	struct
-	{
-		union
-		{
-			bool array[REGISTER_SIMD_COUNT];
-			struct
-			{
-				bool xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
-			} registerGp;
-		} as;
-	} isRegisterSimdAllocated;
+	LocalVariableTable localVariables;
 
-	// Later add scopes maybe store the current scope source so at the end of the scope the stack space is known
-	// Maybe rename to localVariables
-	LocalVariableTable locals;
 	size_t stackAllocationSize;
+	TempArray temps;
+
 	int labelCount;
 
 } Compiler;

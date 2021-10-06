@@ -1,108 +1,94 @@
 #include "Compiler.h"
 #include "Assert.h"
 #include "Alignment.h"
+#include "Generic.h"
+#include "TerminalColors.h"
 
 #include <stdarg.h>
 
+static void errorAt(Compiler* compiler, Token token, const char* message, ...);
+
+static void emitCode(Compiler* compiler, const char* format, ...);
+static void emitInstruction(Compiler* compiler, const char* format, ...);
+static void emitData(Compiler* compiler, const char* format, ...);
+
+static void emitResult(Compiler* compiler, const Result* result);
+static void emitIntConstant(Compiler* compiler, const Result* result);
+static void emitMovToRegisterGp(Compiler* compiler, RegisterGp reg, const Result* result);
+static void emitMovFromRegisterGp(Compiler* compiler, const Result* result, RegisterGp reg);
+static void emitMovToRegisterSimd(Compiler* compiler, RegisterSimd reg, const Result* result);
+static void emitMovFromRegisterSimd(Compiler* compiler, const Result* result, RegisterSimd reg);
+
+static int allocateLabel(Compiler* compiler);
+static size_t allocateSingleVariableOnStack(Compiler* compiler, size_t size);
+static Result allocateTemp(Compiler* compiler, const DataType* dataType);
+static void freeTemp(Compiler* compiler, const Result* temp);
+
+static int getIntegerConversionRank(const DataType* dataType);
+static DataType binaryExpressionGetResultingType(const DataType* a, const DataType* b);
+
+static Result convertToType(Compiler* compiler, const Result* value, const DataType* type);
+
+static Result compileExpr(Compiler* compiler, const Expr* expr);
+static Result compileExprNumberLiteral(Compiler* compiler, const ExprNumberLiteral* expr);
+// Maybe use this later for asignment operators like +=
+static Result compileExprBinary(Compiler* compiler, const ExprBinary* expr);
+static Result compileSimpleIntExprBinary(Compiler* compiler, const char* op, const Result* lhs, const Result* rhs);
+
+static void compileStmt(Compiler* compiler, const Stmt* stmt);
+static void compileStmtExpression(Compiler* compiler, const StmtExpression* stmt);
+static void compileStmtReturn(Compiler* compiler, const StmtReturn* stmt);
+
 void CompilerInit(Compiler* compiler)
 {
-	LocalVariableTableInit(&compiler->locals);
+	LocalVariableTableInit(&compiler->localVariables);
+	TempArrayInit(&compiler->temps);
 }
 
 void CompilerFree(Compiler* compiler)
 {
-	LocalVariableTableFree(&compiler->locals);
+	LocalVariableTableFree(&compiler->localVariables);
+	TempArrayFree(&compiler->temps);
 }
 
-static void errorAt(Compiler* compiler, Token location, const char* format, ...);
+void errorAt(Compiler* compiler, Token token, const char* message, ...)
+{
+	compiler->hadError = true;
 
-static void errorAt(Compiler* compiler, Token location, const char* format, ...)
+	const FileInfo* fileInfo = compiler->fileInfo;
+	size_t lineOffset = token.text.chars - (fileInfo->source.chars + fileInfo->lineStartOffsets.data[token.line]);
+	StringView line = FileInfoGetLine(fileInfo, token.line);
+
+	fprintf(
+		stderr,
+		"%s:%d:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s"
+		"\n%.*s\n"
+		"%*s" TERM_COL_GREEN "^%*s" TERM_COL_RESET "\n",
+		fileInfo->filename, token.line, lineOffset, message,
+		line.length, line.chars,
+		lineOffset, " ", token.text.length - 1, "~"
+	);
+}
+
+static void emitCode(Compiler* compiler, const char* format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	vfprintf(stderr, format, args);
+	StringAppendVaFormat(&compiler->textSection, format, args);
 	va_end(args);
-	printf("\n");
-}
-
-static void freeGpRegister(Compiler* compiler, RegisterGp reg)
-{
-	ASSERT((size_t)reg < REGISTER_GP_COUNT);
-	ASSERT(reg != REGISTER_RSP);
-	ASSERT(reg != REGISTER_RBP);
-	ASSERT(reg != REGISTER_GP_SCRATCH);
-	compiler->isRegisterGpAllocated.as.array[reg] = false;
-}
-
-static void freeGpRegisters(Compiler* compiler)
-{
-	for (int i = 0; i < REGISTER_GP_COUNT; i++)
-	{
-		compiler->isRegisterGpAllocated.as.array[i] = false;
-	}
-
-	compiler->isRegisterGpAllocated.as.registerGp.rsp = true;
-	compiler->isRegisterGpAllocated.as.registerGp.rbp = true;
-
-	compiler->isRegisterGpAllocated.as.array[REGISTER_GP_SCRATCH] = true;
-}
-
-static Result allocateGpRegister(Compiler* compiler)
-{
-	Result reg;
-	reg.locationType = RESULT_LOCATION_REGISTER_GP;
-	for (int i = 0; i < REGISTER_GP_COUNT; i++)
-	{
-		if (compiler->isRegisterGpAllocated.as.array[i] == false)
-		{
-			compiler->isRegisterGpAllocated.as.array[i] = true;
-			reg.location.registerGp = i;
-			return reg;
-		}
-	}
-
-	reg.location.registerGp = REGISTER_ERROR;
-	return reg;
-}
-
-static int allocateLabel(Compiler* compiler)
-{
-	return compiler->labelCount++;
-}
-
-const char* dataSizeToString(size_t size)
-{
-	switch (size)
-	{
-		case SIZE_QWORD: return "QWORD";
-		case SIZE_DWORD: return "DWORD";
-		case SIZE_WORD:  return "WORD";
-		case SIZE_BYTE:  return "BYTE";
-
-		default:
-			ASSERT_NOT_REACHED();
-			return NULL;
-	}
 }
 
 static void emitInstruction(Compiler* compiler, const char* format, ...)
 {
-	StringAppend(&compiler->textSection, "\n\t");
+	emitCode(compiler, "\t");
 	va_list args;
 	va_start(args, format);
 	StringAppendVaFormat(&compiler->textSection, format, args);
 	va_end(args);
+	emitCode(compiler, "\n");
 }
 
-static void emitText(Compiler* compiler, const char* format, ...)
-{
-	va_list args;
-	va_start(args, format);
-	StringAppendVaFormat(&compiler->textSection, format, args);
-	va_end(args);
-}
-
-static void emitData(Compiler* compiler, const char* format, ...)
+void emitData(Compiler* compiler, const char* format, ...)
 {
 	va_list args;
 	va_start(args, format);
@@ -110,277 +96,130 @@ static void emitData(Compiler* compiler, const char* format, ...)
 	va_end(args);
 }
 
-static void emitResultLocation(Compiler* compiler, Result result)
+static void emitResult(Compiler* compiler, const Result* result)
 {
-	switch (result.locationType)
+	switch (result->locationType)
 	{
+		case RESULT_LOCATION_INT_CONSTANT:
+			emitIntConstant(compiler, result);
+			break;
+
 		case RESULT_LOCATION_BASE_OFFSET:
-			StringAppendFormat(&compiler->textSection, " %s [rbp-%u]", dataSizeToString(DataTypeSize(result.dataType)), result.location.baseOffset);
-			break;
-
-		case RESULT_LOCATION_REGISTER_GP:
-			StringAppendFormat(&compiler->textSection, " %s", RegisterGpToString(result.location.registerGp, DataTypeSize(result.dataType)));
-			break;
-
-			// chnage later // wont work with bigger immediates
-		case RESULT_LOCATION_IMMEDIATE:
-			StringAppendFormat(&compiler->textSection, " %d", result.location.immediate);
+			emitCode(compiler, "[rbp-%zx]", result->location.baseOffset);
 			break;
 
 		case RESULT_LOCATION_LABEL:
-			StringAppendFormat(&compiler->textSection, " [.L%d]", result.location.label);
+			emitCode(compiler, "[.L%d]", result->location.labelIndex);
+			break;
+
+		case RESULT_LOCATION_TEMP:
+			emitCode(compiler, "[rbp-%zx]", compiler->temps.data[result->location.tempIndex]);
 			break;
 
 		default:
 			ASSERT_NOT_REACHED();
+	}
+}
+
+void emitIntConstant(Compiler* compiler, const Result* result)
+{
+	// Don't know if there is a difference between signed and unsigned here.
+	switch (result->dataType.type)
+	{
+		case DATA_TYPE_CHAR:
+			emitCode(compiler, "%d", result->location.charConstant);
 			break;
+		case DATA_TYPE_SHORT:
+			emitCode(compiler, "%d", result->location.shortConstant);
+			break;
+		case DATA_TYPE_INT:
+			emitCode(compiler, "%d", result->location.intConstant);
+			break;
+		case DATA_TYPE_LONG:
+			emitCode(compiler, "%d", result->location.intConstant);
+			break;
+		case DATA_TYPE_LONG_LONG:
+			emitCode(compiler, "%ll", result->location.longLongConstant);
+			break;
+
+		default:
+			ASSERT_NOT_REACHED();
 	}
 }
 
-static void emitTwoOperandInstruction(Compiler* compiler, const char* op, const Result* a, const Result* b)
+static void emitMovToRegisterGp(Compiler* compiler, RegisterGp reg, const Result* result)
 {
-	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
-	emitResultLocation(compiler, *a);
-	emitText(compiler, ",");
-	emitResultLocation(compiler, *b);
+	emitCode(compiler, "\tmov %s, ", RegisterGpToString(reg, DataTypeSize(&result->dataType)));
+	emitResult(compiler, result);
+	emitCode(compiler, "\n");
 }
 
-static void emitInstructionOperandTemp(Compiler* compiler, const char* op, const Result* operand, const Result* temp)
+static void emitMovFromRegisterGp(Compiler* compiler, const Result* result, RegisterGp reg)
 {
-	Result tmp = *temp;
-	tmp.dataType = operand->dataType;
-	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
-	emitResultLocation(compiler, *operand);
-	emitText(compiler, ",");
-	emitResultLocation(compiler, tmp);
+	emitCode(compiler, "\tmov ");
+	emitResult(compiler, result);
+	emitCode(compiler, ", %s\n", RegisterGpToString(reg, DataTypeSize(&result->dataType)));
 }
 
-static void emitInstructionTempOperand(Compiler* compiler, const char* op, const Result* temp, const Result* operand)
+static void emitMovToRegisterSimd(Compiler* compiler, RegisterSimd reg, const Result* result)
 {
-	Result tmp = *temp;
-	tmp.dataType = operand->dataType;
-	StringAppendFormat(&compiler->textSection, "\n\t%s", op);
-	emitResultLocation(compiler, tmp);
-	emitText(compiler, ",");
-	emitResultLocation(compiler, *operand);
+	emitCode(compiler, "\tmov %s, ", RegisterSimdToString(reg));
+	emitResult(compiler, result);
+	emitCode(compiler, "\n");
 }
 
-static DataType sizeToDataType(size_t size)
+static void emitMovFromRegisterSimd(Compiler* compiler, const Result* result, RegisterSimd reg)
 {
-	DataType dataType;
-
-	switch (size)
-	{
-		case 1: dataType.type = DATA_TYPE_CHAR; break;
-		case 2: dataType.type = DATA_TYPE_SHORT; break;
-		case 4: dataType.type = DATA_TYPE_INT; break;
-		case 8: dataType.type = DATA_TYPE_LONG_LONG; break;
-
-	default:
-		ASSERT_NOT_REACHED();
-		break;
-	}
-
-	return dataType;
+	emitCode(compiler, "\tmov ");
+	emitResult(compiler, result);
+	emitCode(compiler, ", %s\n", RegisterSimdToString(reg));
 }
 
-static Result ResultFromRegisterGp(RegisterGp reg, size_t size)
+static int allocateLabel(Compiler* compiler)
 {
-	Result result;
-	result.locationType = RESULT_LOCATION_REGISTER_GP;
-	result.location.registerGp = reg;
-	result.dataType = sizeToDataType(size);
-
-	return result;
+	return compiler->labelCount++;
 }
 
-static Result compileExpr(Compiler* compiler, Expr* expr);
-
-StringView removeNumberLiteralSuffix(StringView numberLiteral)
-{
-	const char* current = numberLiteral.chars + numberLiteral.length - 1;
-	while ((((*current >= '0') && (*current <= '9')) || (*current == '.')) == false)
-		current--;
-	numberLiteral.length = current - numberLiteral.chars + 1;
-	return numberLiteral;
-}
-
-static Result compileExprNumberLiteral(Compiler* compiler, ExprNumberLiteral* expr)
-{
-	Result result;
-	result.dataType = expr->type; 
-	if (expr->literal.type == TOKEN_INT_LITERAL)
-	{
-		result.locationType = RESULT_LOCATION_IMMEDIATE;
-		// Don't know if this works or should there be a switch of types
-		result.location.immediate = strtol(expr->literal.text.chars, NULL, 0);
-	}
-	else
-	{
-		result.locationType = RESULT_LOCATION_LABEL;
-		result.location.label = allocateLabel(compiler);
-
-		StringView literal = removeNumberLiteralSuffix(expr->literal.text);
-		switch (result.dataType.type)
-		{
-			case DATA_TYPE_FLOAT:
-				emitData(compiler, "\n.L%d:\n\tdd %.*s", result.location.label, literal.length, literal.chars);
-				break;
-
-			case DATA_TYPE_DOUBLE:
-				emitData(compiler, "\n.L%d:\n\tdq %.*s", result.location.label, literal.length, literal.chars);
-				break;
-
-			case DATA_TYPE_LONG_DOUBLE:
-				break;
-
-			default:
-				ASSERT_NOT_REACHED();
-				break;
-		}
-	}
-
-	return result;
-}
-
-// Returns the base offset
 static size_t allocateSingleVariableOnStack(Compiler* compiler, size_t size)
 {
 	// On x86 data in memory should be aligned to the size of the data.
-	// If memory is not aligned the cpu might need to perform 2 loads or with some instructions the program might crash.
+	// If memory is not aligned the cpu might need to perform 2 loads
+	// or with some instructions the program might crash.
 	compiler->stackAllocationSize = ALIGN_UP_TO(size, compiler->stackAllocationSize) + size;
 	return compiler->stackAllocationSize;
 }
 
-static bool isResultLocationMemory(ResultLocationType locationType)
+Result allocateTemp(Compiler* compiler, const DataType* dataType)
 {
-	return (locationType == RESULT_LOCATION_BASE_OFFSET) || (locationType == RESULT_LOCATION_LABEL);
-}
+	Result result;
+	result.locationType = RESULT_LOCATION_TEMP;
+	result.dataType = *dataType;
 
-static bool isResultLocationRegister(ResultLocationType locationType)
-{
-	return locationType == RESULT_LOCATION_REGISTER_GP;
-}
+	size_t tempSize = DataTypeSize(dataType);
+	for (size_t i = 0; i < compiler->temps.size; i++)
+	{
+		if ((compiler->temps.data[i].isAllocated == false)
+		 && (compiler->temps.data[i].size >= tempSize))
+		{
+			result.location.tempIndex = i;
+			return result;
+		}
+	}
 
-static bool isResultLocationImmediate(ResultLocationType locationType)
-{
-	return locationType == RESULT_LOCATION_IMMEDIATE;
-}
+	Temp newTemp = {
+		.baseOffset = allocateSingleVariableOnStack(compiler, tempSize),
+		.size = tempSize,
+		.isAllocated = true
+	};
+	result.location.tempIndex = compiler->temps.size;
+	TempArrayAppend(&compiler->temps, newTemp);
 
-// What to do if register allocation failure
-// Could return a memory location but there are problems with stack alignment
-static bool moveToRegister(Compiler* compiler, Result value, Result* result)
-{
-	Result reg = allocateGpRegister(compiler);
-
-	if (reg.location.registerGp == -1)
-		return false;
-
-	result->locationType = RESULT_LOCATION_REGISTER_GP;
-	result->location.registerGp = reg.location.registerGp;
-
-	emitInstruction(compiler, "mov %s,", RegisterGpToString(result->location.registerGp, DataTypeSize(value.dataType)));
-	emitResultLocation(compiler, value);
-
-	return true;
-}
-
-Result allocateTemp(Compiler* compiler, size_t size)
-{
-	Result temp;
-	// Don't know the size of temp so just use QWORD
-	temp.location.baseOffset = allocateSingleVariableOnStack(compiler, size);
-	temp.locationType = RESULT_LOCATION_BASE_OFFSET;
-	temp.dataType = sizeToDataType(size);
-	return temp;
+	return result;
 }
 
 void freeTemp(Compiler* compiler, const Result* temp)
 {
-
-}
-
-// Handles operations that have encoding op reg, reg
-static Result compileSimpleIntBinaryExpression(Compiler* compiler, Result lhs, Result rhs, TokenType operator)
-{
-	Result result;
-
-	Result savedRegisterLhs = ResultFromRegisterGp(REGISTER_ERROR, SIZE_QWORD);
-	Result tempLocationLhs = { 0, 0, 0 };
-
-	if (lhs.locationType != RESULT_LOCATION_REGISTER_GP)
-	{
-		// Couldn't allocate register for lhs
-		if (moveToRegister(compiler, lhs, &lhs) == false)
-		{
-			// Take any register to move the value into
-			savedRegisterLhs = ResultFromRegisterGp(REGISTER_RAX, SIZE_QWORD);
-
-			// Move the value to a temp memory location
-			tempLocationLhs = allocateTemp(compiler, SIZE_QWORD);
-			emitTwoOperandInstruction(compiler, "mov", &tempLocationLhs, &savedRegisterLhs);
-
-			// Move lhs to register.
-			//emitTwoOperandInstruction(compiler, "mov", &savedRegisterLhs, &lhs);
-			emitInstructionTempOperand(compiler, "mov", &savedRegisterLhs, &lhs);
-			
-			lhs.locationType = RESULT_LOCATION_REGISTER_GP;
-			lhs.location.registerGp = savedRegisterLhs.location.registerGp;
-		}
-	}
-
-	if (rhs.locationType != RESULT_LOCATION_REGISTER_GP)
-	{
-		if (moveToRegister(compiler, rhs, &rhs) == false)
-		{
-			Result scratchRegister = ResultFromRegisterGp(REGISTER_GP_SCRATCH, DataTypeSize(rhs.dataType));
-			emitTwoOperandInstruction(compiler, "mov", &scratchRegister, &rhs);
-
-			rhs.locationType = RESULT_LOCATION_REGISTER_GP;
-			rhs.location.registerGp = REGISTER_GP_SCRATCH;
-		}
-	}
-
-	const char* op = "";
-	switch (operator)
-	{
-		case TOKEN_PLUS:       op = "add";  break;
-		case TOKEN_MINUS:      op = "sub";  break;
-		case TOKEN_AMPERSAND:  op = "and";  break;
-		case TOKEN_PIPE:       op = "or";   break;
-		case TOKEN_CIRCUMFLEX: op = "xor";  break;
-		case TOKEN_ASTERISK:   op = "imul"; break;
-			
-		default:
-			ASSERT_NOT_REACHED();
-			break;
-	}
-
-	emitTwoOperandInstruction(compiler, op, &lhs, &rhs);
-
-	if ((rhs.locationType == RESULT_LOCATION_REGISTER_GP) && (rhs.location.registerGp != REGISTER_GP_SCRATCH))
-	{
-		freeGpRegister(compiler, rhs.location.registerGp);
-	}
-
-	if (savedRegisterLhs.location.registerGp != REGISTER_ERROR)
-	{
-		Result scratchRegister = ResultFromRegisterGp(REGISTER_GP_SCRATCH, SIZE_QWORD);
-		// Move the saved register to the sratch register
-		emitTwoOperandInstruction(compiler, "mov", &scratchRegister, &tempLocationLhs);
-
-		// Move lhs to the temp location
-		emitTwoOperandInstruction(compiler, "mov", &tempLocationLhs, &savedRegisterLhs);
-
-		// Move the previous value of the register back to it
-		emitTwoOperandInstruction(compiler, "mov", &savedRegisterLhs, &scratchRegister);
-		
-		// Add location type temp the size of the temp might be larger that the data stored in it
-		lhs.locationType = RESULT_LOCATION_BASE_OFFSET;
-		lhs.location.baseOffset = tempLocationLhs.location.baseOffset;
-	}
-
-	return lhs;
+	compiler->temps.data[temp->location.tempIndex].isAllocated = false;
 }
 
 static int getIntegerConversionRank(const DataType* dataType)
@@ -398,7 +237,6 @@ static int getIntegerConversionRank(const DataType* dataType)
 	}
 }
 
-// Unit test this
 static DataType binaryExpressionGetResultingType(const DataType* a, const DataType* b)
 {
 	DataType result;
@@ -441,163 +279,82 @@ static DataType binaryExpressionGetResultingType(const DataType* a, const DataTy
 		{
 			result.type = a->type;
 			result.isUnsigned = true;
+			return result;
 		}
 		else if ((b->isUnsigned) && (bConversionRank >= aConversionRank))
 		{
 			result.type = b->type;
 			result.isUnsigned = true;
+			return result;
 		}
 	}
 
+	// Should have returned at integerConversionRank == -1
+	ASSERT_NOT_REACHED();
+		
 	result.type = DATA_TYPE_ERROR;
-
 	return result;
 }
 
-static Result convertImmediate(Compiler* compiler, const DataType* type, const Result* value)
-{
-	Result result;
-	result.dataType = *type;
-
-	switch (type->type)
-	{
-		// Don't know if this works is conversion needed ?
-		case DATA_TYPE_CHAR:
-		case DATA_TYPE_SHORT:
-		case DATA_TYPE_INT:
-		case DATA_TYPE_LONG:
-		case DATA_TYPE_LONG_LONG:
-			result.location = value->location;
-			result.locationType = value->locationType;
-			break;
-
-		case DATA_TYPE_DOUBLE:
-		case DATA_TYPE_FLOAT:
-		{
-			int label = allocateLabel(compiler);
-			emitData(compiler, "\n.L%d:\n\t", label);
-			result.location.label = label;
-			result.locationType = RESULT_LOCATION_LABEL;
-
-			switch (type->type)
-			{
-				case DATA_TYPE_DOUBLE: emitData(compiler, "dq "); break;
-				case DATA_TYPE_FLOAT: emitData(compiler, "dd "); break;
-			}
-
-			switch (value->dataType.type)
-			{
-			case DATA_TYPE_CHAR:
-				if (value->dataType.isUnsigned) emitData(compiler, "%u.0", value->location.charImmediate);
-				else emitData(compiler, "%d.0", value->location.charImmediate);
-				break;
-
-			case DATA_TYPE_SHORT:
-				if (value->dataType.isUnsigned) emitData(compiler, "%u.0", value->location.shortImmediate);
-				else emitData(compiler, "%d.0", value->location.shortImmediate);
-				break;
-
-			case DATA_TYPE_INT:
-				if (value->dataType.isUnsigned) emitData(compiler, "%u.0", value->location.intImmediate);
-				else emitData(compiler, "%d.0", value->location.intImmediate);
-				break;
-
-
-			case DATA_TYPE_LONG:
-				if (value->dataType.isUnsigned) emitData(compiler, "%u.0", value->location.intImmediate);
-				else emitData(compiler, "%d.0", value->location.intImmediate);
-				break;
-
-
-			case DATA_TYPE_LONG_LONG:
-				if (value->dataType.isUnsigned) emitData(compiler, "%llu.0", value->location.intImmediate);
-				else emitData(compiler, "%ll.0", value->location.intImmediate);
-				break;
-
-			default:
-				ASSERT_NOT_REACHED();
-			}
-
-			break;
-		}
-
-		case DATA_TYPE_LONG_DOUBLE:
-			break;
-
-		default:
-			ASSERT_NOT_REACHED();
-	}
-
-	return result;
-}
-
-static Result convertToType(Compiler* compiler, const DataType* type, const Result* value)
+Result convertToType(Compiler* compiler, const Result* value, const DataType* type)
 {
 	if (value->dataType.type == type->type)
 		return *value;
-
-	Result result;
-
-	// Long and int are the same size
-	size_t aSize = DataTypeSize(*type);
-	size_t bSize = DataTypeSize(value->dataType);
-
-	// If the resulting size is smaller just take the lower part of the bigger type
-	if (aSize <= bSize)
-	{
-		result = *value;
-		result.dataType = *type;
-		return result;
-	}
-
-	if (DataTypeIsInt(&value->dataType) && value->locationType == RESULT_LOCATION_IMMEDIATE)
-	{
-		return convertImmediate(compiler, type, value);
-	}
-
-	if (DataTypeIsInt(type) && DataTypeIsInt(&value->dataType))
-	{
-		Result reg;
-		if (value->locationType == RESULT_LOCATION_REGISTER_GP)
-		{
-			Result scratchRegister = ResultFromRegisterGp(REGISTER_GP_SCRATCH, )
-			emitTwoOperandInstruction(compiler, )
-		}
-	}
-
-	//if (DataTypeIsFloat(type))
-	//{
-	//	Result reg;
-	//	if (value->locationType == RESULT_LOCATION_REGISTER_GP)
-	//	{
-
-	//	}
-	//}
-
-	ASSERT_NOT_REACHED();
 }
 
-static Result evaluateConstantBinaryExpression(Compiler* compiler, const Result* lhs, const Result* rhs, Token operator)
+static Result compileExpr(Compiler* compiler, const Expr* expr)
+{
+	switch (expr->type)
+	{
+	case EXPR_NUMBER_LITERAL:
+		return compileExprNumberLiteral(compiler, (ExprNumberLiteral*)expr);
+	case EXPR_BINARY:
+		return compileExprBinary(compiler, (ExprBinary*)expr);
+
+	default:
+		ASSERT_NOT_REACHED();
+	}
+}
+
+static Result compileExprNumberLiteral(Compiler* compiler, const ExprNumberLiteral* expr)
 {
 	Result result;
-	result.dataType = lhs->dataType;
-	result.locationType = RESULT_LOCATION_IMMEDIATE;
-	
-	switch (rhs->dataType.type)
+	result.dataType = expr->dataType;
+
+	switch (expr->dataType.type)
 	{
-		case DATA_TYPE_INT: 
-		{
-			switch (operator.type)
-			{
-			case TOKEN_PLUS: result.location.intImmediate = lhs->location.intImmediate + rhs->location.intImmediate; break;
-			case TOKEN_MINUS: result.location.intImmediate = lhs->location.intImmediate - rhs->location.intImmediate; break;
+		case DATA_TYPE_INT:
+		case DATA_TYPE_LONG:
+		case DATA_TYPE_LONG_LONG:
+			result.locationType = RESULT_LOCATION_INT_CONSTANT;
+			result.location.constant = strtoll(expr->literal.text.chars, NULL, 0);
+			break;
 
-			default:
-				errorAt(compiler, operator, "Invalid operands for binary operator %s", "later add type");
-				break;
-			}
-		}
+		case DATA_TYPE_FLOAT:
+			result.locationType = RESULT_LOCATION_LABEL;
+			result.location.labelIndex = allocateLabel(compiler);
+			emitData(
+				compiler, ".L%d:\n\tdd %f\n",
+				result.location.labelIndex, 
+				strtof(expr->literal.text.chars, NULL)
+			);
+			break;
 
+		case DATA_TYPE_DOUBLE:
+			result.locationType = RESULT_LOCATION_LABEL;
+			result.location.labelIndex = allocateLabel(compiler);
+			emitData(
+				compiler, ".L%d:\n\tdq %f\n",
+				result.location.labelIndex,
+				strtof(expr->literal.text.chars, NULL)
+			);
+			break;
+
+		case DATA_TYPE_LONG_DOUBLE:
+			break;
+			
+		default:
+			ASSERT_NOT_REACHED();
 	}
 
 	return result;
@@ -605,100 +362,88 @@ static Result evaluateConstantBinaryExpression(Compiler* compiler, const Result*
 
 static Result compileExprBinary(Compiler* compiler, const ExprBinary* expr)
 {
-	Result a = compileExpr(compiler, expr->left);
-	Result b = compileExpr(compiler, expr->right);
-
-	DataType resultingType = binaryExpressionGetResultingType(&a.dataType, &b.dataType);
+	errorAt(compiler, expr->operator, "Test error");
+	Result lhs = compileExpr(compiler, expr->left);
+	Result rhs = compileExpr(compiler, expr->right);
+	// Could check if the types are fundemental types
+	DataType resultingType = binaryExpressionGetResultingType(&lhs.dataType, &rhs.dataType);
 	if (resultingType.type == DATA_TYPE_ERROR)
 	{
-		errorAt(compiler, expr->operator, "Conversion error");
+		
 	}
 
-	Result lhs = convertToType(compiler, &resultingType, &a);
-	Result rhs = convertToType(compiler, &resultingType, &b);
-
-	if ((lhs.locationType == RESULT_LOCATION_IMMEDIATE) && (rhs.locationType == RESULT_LOCATION_IMMEDIATE))
+	lhs = convertToType(compiler, &lhs, &resultingType);
+	rhs = convertToType(compiler, &rhs, &resultingType);
+	
+	if ((lhs.locationType == RESULT_LOCATION_INT_CONSTANT) && (rhs.locationType == RESULT_LOCATION_INT_CONSTANT))
 	{
-		return evaluateConstantBinaryExpression(compiler, &lhs, &rhs, expr->operator);
+		// return evaluateConstantBinaryExpression(compiler, &lhs, &rhs);
 	}
 
 	switch (expr->operator.type)
 	{
-		case TOKEN_PLUS:
-		case TOKEN_MINUS:
-		case TOKEN_AMPERSAND:
-		case TOKEN_PIPE:
-		case TOKEN_CIRCUMFLEX:
-			return compileSimpleIntBinaryExpression(compiler, lhs, rhs, expr->operator.type);
+		case TOKEN_PLUS:       return compileSimpleIntExprBinary(compiler, "add", &lhs, &rhs);
+		case TOKEN_MINUS:      return compileSimpleIntExprBinary(compiler, "sub", &lhs, &rhs);
+		case TOKEN_AMPERSAND:  return compileSimpleIntExprBinary(compiler, "and", &lhs, &rhs);
+		case TOKEN_PIPE:	   return compileSimpleIntExprBinary(compiler, "or", &lhs, &rhs);
+		case TOKEN_CIRCUMFLEX: return compileSimpleIntExprBinary(compiler, "xor", &lhs, &rhs);
+
 		case TOKEN_ASTERISK:
 		{
 			if (resultingType.isUnsigned)
 				{}
-			else
-				return compileSimpleIntBinaryExpression(compiler, lhs, rhs, expr->operator.type);
-
+			else						
+				return compileSimpleIntExprBinary(compiler, "imul", &lhs, &rhs);
 		}
 
 		default:
 			ASSERT_NOT_REACHED();
-			break;
 	}
 }
 
-static Result compileExprIdentifier(Compiler* compiler, ExprIdentifier* expr)
+// Compiles operations that correspond to instructions with encoding op reg, reg.
+// Requires lhs.dataType == rhs.dataType
+static Result compileSimpleIntExprBinary(Compiler* compiler, const char* op, const Result* lhs, const Result* rhs)
 {
-	Result result;
-	result.locationType = RESULT_LOCATION_BASE_OFFSET;
+	emitMovToRegisterGp(compiler, REGISTER_RAX, lhs);
+	emitMovToRegisterGp(compiler, REGISTER_RBX, rhs);
 
-	// Change this later to string view 
-	StringView name = StringViewInit(expr->name.text.chars, expr->name.text.length);
-	LocalVariable variable;
-	if (LocalVariableTableGet(&compiler->locals, &name, &variable) == false)
-	{
-		errorAt(compiler, expr->name, "'%.*s' undeclared", expr->name.text.length, expr->name.text.chars);
-	}
+	size_t resultSize = DataTypeSize(&lhs->dataType);
 
-	result.location.baseOffset = variable.baseOffset;
-	result.dataType = variable.type;
+	emitInstruction(
+		compiler, "%s %s, %s", op,
+		RegisterGpToString(REGISTER_RAX, resultSize),
+		RegisterGpToString(REGISTER_RBX, resultSize)
+	);
+
+	if (lhs->locationType == RESULT_LOCATION_TEMP) freeTemp(compiler, lhs);
+	if (rhs->locationType == RESULT_LOCATION_TEMP) freeTemp(compiler, rhs);
+
+	Result result = allocateTemp(compiler, &lhs->dataType);
+	emitMovFromRegisterGp(compiler, &result, REGISTER_RAX);
 	return result;
 }
 
-static Result compileExpr(Compiler* compiler, Expr* expr)
+static void compileStmt(Compiler* compiler, const Stmt* stmt)
 {
-	switch (expr->type)
+	switch (stmt->type)
 	{
-		case EXPR_BINARY: return compileExprBinary(compiler, (ExprBinary*)expr); 
-		case EXPR_NUMBER_LITERAL: return compileExprNumberLiteral(compiler, (ExprNumberLiteral*)expr);
-		case EXPR_IDENTIFIER: return compileExprIdentifier(compiler, (ExprIdentifier*)expr);
-		case EXPR_GROUPING: return compileExpr(compiler, ((ExprGrouping*)expr)->expression);
+	case STMT_EXPRESSION:
+		compileStmtExpression(compiler, (StmtExpression*)stmt);
+		break;
 
-		default:
-			ASSERT_NOT_REACHED();
-	}	
+	case STMT_RETURN:
+		compileStmtReturn(compiler, (StmtReturn*)stmt);
+		break;
+
+	default:
+		ASSERT_NOT_REACHED();
+	}
 }
 
 static void compileStmtExpression(Compiler* compiler, const StmtExpression* stmt)
 {
-	freeGpRegisters(compiler);
 	compileExpr(compiler, stmt->expresssion);
-}
-
-static void compileStmtVariableDeclaration(Compiler* compiler, StmtVariableDeclaration* stmt)
-{
-	LocalVariable variable;
-	variable.baseOffset = allocateSingleVariableOnStack(compiler, DataTypeSize(stmt->type));
-	variable.type = stmt->type;
-	StringView variableName = stmt->name.text;
-	LocalVariableTableSet(&compiler->locals, &variableName, variable);
-	
-	// if is integral data type
-	if (stmt->initializer != NULL)
-	{
-		emitInstruction(compiler, "mov %s [rbp-%u],", dataSizeToString(DataTypeSize(variable.type)), variable.baseOffset);
-		Result initializer = compileExpr(compiler, stmt->initializer);
-		emitResultLocation(compiler, convertToType(compiler, &stmt->type, &initializer));
-	}
-	// Wont work with 2 memory operands
 }
 
 static void compileStmtReturn(Compiler* compiler, const StmtReturn* stmt)
@@ -706,41 +451,19 @@ static void compileStmtReturn(Compiler* compiler, const StmtReturn* stmt)
 	if (stmt->returnValue != NULL)
 	{
 		Result returnValue = compileExpr(compiler, stmt->returnValue);
-
-		if ((returnValue.locationType == RESULT_LOCATION_REGISTER_GP)
-	     && (returnValue.location.registerGp != REGISTER_RAX))
-		{
-			emitInstruction(compiler, "mov %s,", RegisterGpToString(REGISTER_RAX, DataTypeSize(returnValue.dataType)));
-			emitResultLocation(compiler, returnValue);
-		}
-	}
-	//emitInstruction(compiler, "ret");
-}
-
-static void compileStmt(Compiler* compiler, const Stmt* stmt)
-{
-	switch (stmt->type)
-	{
-		case STMT_EXPRESSION: compileStmtExpression(compiler, (StmtExpression*)stmt); break;
-		case STMT_VARIABLE_DECLARATION: compileStmtVariableDeclaration(compiler, (StmtVariableDeclaration*)stmt); break;
-		case STMT_RETURN: compileStmtReturn(compiler, (StmtReturn*)stmt); break;
-
-		default:
-			ASSERT_NOT_REACHED();
-			break;
+		emitMovToRegisterGp(compiler, REGISTER_RAX, &returnValue);
 	}
 }
 
-// Make it return a String object;
 String CompilerCompile(Compiler* compiler, const FileInfo* fileInfo, const StmtArray* ast)
 {
 	compiler->fileInfo = fileInfo;
-	compiler->textSection = StringCopy("section .text\nglobal _start\n_start:\n\tmov rbp, rsp");
-	compiler->dataSection = StringCopy("\nsection .data");
+	compiler->textSection = StringCopy("section .text\nglobal _start\n_start:\n\tmov rbp, rsp\n");
+	compiler->dataSection = StringCopy("\nsection .data\n");
 	compiler->stackAllocationSize = 0;
 	compiler->labelCount = 0;
-	freeGpRegisters(compiler);
 
+	TempArrayClear(&compiler->temps);
 	for (size_t i = 0; i < ast->size; i++)
 	{
 		compileStmt(compiler, ast->data[i]);
@@ -755,3 +478,10 @@ String CompilerCompile(Compiler* compiler, const FileInfo* fileInfo, const StmtA
 
 	return compiler->textSection;
 }
+
+static void copyTemp(Temp* dst, const Temp* src)
+{
+	*dst = *src;
+}
+
+ARRAY_TEMPLATE_DEFINITION(TempArray, Temp, copyTemp, NO_OP_FUNCTION)

@@ -124,6 +124,11 @@ static char peek(Scanner* scanner)
 	return *scanner->currentChar;
 }
 
+static char peekPrevious(Scanner* scanner)
+{
+	return scanner->currentChar[-1];
+}
+
 static bool match(Scanner* scanner, char chr)
 {
 	if (peek(scanner) == chr)
@@ -258,7 +263,7 @@ static Token number(Scanner* scanner)
 
 	// Priror to c99 hexiadecimal constant were not allowed put they require special syntax.
 	// 0x1.2p3; // hex fraction 1.2 (decimal 1.125) scaled by 2^3, that is 9.0
-	// If the float constant starts with a zero they zeros are ignored so
+	// If the float constant starts with a zero the zeros are ignored so
 	// there doesn't need to be a special case for octal literals
 	if ((isAtEnd(scanner) == false) && match(scanner, '.'))
 	{
@@ -284,31 +289,40 @@ static Token number(Scanner* scanner)
 			advance(scanner);
 	}
 
-	// Don't know if the suffix should be a saparate token or not.
-	// I could also make a token for each literal type but that would make 9 tokens for numbers
-
 	if (isFloat && (isAtEnd(scanner) == false))
 	{
-		(match(scanner, 'f') || match(scanner, 'F')) || ((match(scanner, 'l') || match(scanner, 'L')));
+		if (match(scanner, 'f') || match(scanner, 'F'))
+		{
+			return makeToken(scanner, TOKEN_FLOAT_LITERAL);
+		}
+		else if (match(scanner, 'l') || match(scanner, 'L'))
+		{
+			return makeToken(scanner, TOKEN_LONG_DOUBLE_LITERAL);
+		}
 
-		return makeToken(scanner, TOKEN_FLOAT_LITERAL);
+		return makeToken(scanner, TOKEN_DOUBLE_LITERAL);
 	}
 	else
 	{
-		match(scanner, 'u') || match(scanner, 'U');
+		bool isUnsigned = match(scanner, 'u') || match(scanner, 'U');
 
-		if ((isAtEnd(scanner) == false) && match(scanner, 'l'))
+		if ((isAtEnd(scanner) == false) && (match(scanner, 'l') || match(scanner, 'L')))
 		{
-			match(scanner, 'l');
-		}
-		else if ((isAtEnd(scanner) == false) && match(scanner, 'L'))
-		{
-			match(scanner, 'L');
+			// The long long literal letters have to have the same case ("LL" or "ll").
+			if (peek(scanner) == peekPrevious(scanner))
+			{
+				return isUnsigned
+					? makeToken(scanner, TOKEN_UNSIGNED_LONG_LONG_LITERAL)
+					: makeToken(scanner, TOKEN_LONG_LONG_LITERAL);
+			}
+
+			return isUnsigned
+				? makeToken(scanner, TOKEN_UNSIGNED_LONG_LITERAL)
+				: makeToken(scanner, TOKEN_LONG_LITERAL);
 		}
 
 		return makeToken(scanner, TOKEN_INT_LITERAL);
 	}
-
 }
 
 static Token identifierOrKeyword(Scanner* scanner)

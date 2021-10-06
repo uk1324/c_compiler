@@ -144,7 +144,6 @@
     <ClCompile Include="src\Cli.c" />
     <ClCompile Include="src\Compiler.c" />
     <ClCompile Include="src\IntArray.c" />
-    <ClCompile Include="src\Json.c" />
     <ClCompile Include="src\main.c" />
     <ClCompile Include="src\Parser.c" />
     <ClCompile Include="src\Registers.c" />
@@ -163,7 +162,6 @@
     <ClInclude Include="src\Compiler.h" />
     <ClInclude Include="src\Generic.h" />
     <ClInclude Include="src\IntArray.h" />
-    <ClInclude Include="src\Json.h" />
     <ClInclude Include="src\Parser.h" />
     <ClInclude Include="src\Registers.h" />
     <ClInclude Include="src\Scanner.h" />
