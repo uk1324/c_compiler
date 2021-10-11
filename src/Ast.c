@@ -43,6 +43,14 @@ void ExprFree(Expr* expression)
 		case EXPR_IDENTIFIER:
 			break;
 
+		case EXPR_ASSIGNMENT:
+		{
+			ExprAssignment* expr = (ExprAssignment*)expression;
+			ExprFree(expr->left);
+			ExprFree(expr->right);
+			break;
+		}
+
 		default:
 			ASSERT_NOT_REACHED();
 			break;
@@ -83,7 +91,8 @@ void StmtFree(Stmt* statement)
 		case STMT_VARIABLE_DECLARATION:
 		{
 			StmtVariableDeclaration* stmt = (StmtVariableDeclaration*)statement;
-			ExprFree(stmt->initializer);
+			if (stmt->initializer != NULL)
+				ExprFree(stmt->initializer);
 			break;
 		}
 
@@ -91,6 +100,47 @@ void StmtFree(Stmt* statement)
 		{
 			StmtReturn* stmt = (StmtReturn*)statement;
 			ExprFree(stmt->returnValue);
+			break;
+		}
+
+		case STMT_BLOCK:
+		{
+			StmtBlock* stmt = (StmtBlock*)statement;
+			for (size_t i = 0; i < stmt->satements.size; i++)
+			{
+				StmtFree(stmt->satements.data[i]);
+			}
+			break;
+		}
+
+		case STMT_IF:
+		{
+			StmtIf* stmt = (StmtIf*)statement;
+			StmtFree(stmt->thenBlock);
+			if (stmt->elseBlock != NULL)
+				StmtFree(stmt->elseBlock);
+			ExprFree(stmt->condition);
+			break;
+		}
+
+		case STMT_WHILE_LOOP:
+		{
+			StmtWhileLoop* stmt = (StmtWhileLoop*)statement;
+			ExprFree(stmt->condition);
+			StmtFree(stmt->body);
+			break;
+		}
+
+		case STMT_BREAK:
+			break;
+
+		case STMT_CONTINUE:
+			break;
+
+		case STMT_PUTCHAR:
+		{
+			StmtPutchar* stmt = (StmtPutchar*)statement;
+			ExprFree(stmt->expresssion);
 			break;
 		}
 

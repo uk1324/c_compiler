@@ -30,6 +30,7 @@ typedef enum
 {
 	RESULT_LOCATION_BASE_OFFSET,
 	RESULT_LOCATION_TEMP,
+	RESULT_LOCATION_LABEL_COSTANT,
 	RESULT_LOCATION_LABEL,
 	RESULT_LOCATION_INT_CONSTANT,
 } ResultLocationType;
@@ -60,7 +61,7 @@ typedef struct
 		// Used if RESUL_LOCATION_TEMP
 		int tempIndex;
 
-		// Used if RESULT_LOCATION_LABEL
+		// Used if RESULT_LOCATION_LABEL and RESULT_LOCATION_LABEL_COSTANT
 		size_t labelIndex;
 
 		// Used if RESULT_LOCATION_CONSTANT
@@ -72,6 +73,20 @@ typedef struct
 	} location;
 } Result;
 
+typedef struct Scope
+{
+	LocalVariableTable localVariables;
+	struct Scope* enclosing;
+} Scope;
+
+typedef struct Loop
+{
+	// Labels
+	struct Loop* enclosing;
+	int loopStart;
+	int loopEnd;
+} Loop;
+
 typedef struct
 {
 	String textSection;
@@ -82,10 +97,11 @@ typedef struct
 	// For line information
 	const FileInfo* fileInfo;
 
-	LocalVariableTable localVariables;
-
 	size_t stackAllocationSize;
 	TempArray temps;
+
+	Scope* currentScope;
+	Loop* currentLoop;
 
 	int labelCount;
 

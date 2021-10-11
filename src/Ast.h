@@ -18,7 +18,8 @@ typedef enum
 	EXPR_UNARY,
 	EXPR_NUMBER_LITERAL,
 	EXPR_GROUPING,
-	EXPR_IDENTIFIER
+	EXPR_IDENTIFIER,
+	EXPR_ASSIGNMENT
 } ExprType;
 
 typedef struct
@@ -68,11 +69,26 @@ typedef struct
 	DataType dataType;
 } ExprNumberLiteral;
 
+typedef struct
+{
+	Expr expr;
+	Expr* left;
+	Expr* right;
+	Token operator;
+} ExprAssignment;
+
 typedef enum
 {
 	STMT_EXPRESSION,
 	STMT_VARIABLE_DECLARATION,
-	STMT_RETURN
+	STMT_RETURN,
+	STMT_BLOCK,
+	STMT_IF,
+	STMT_WHILE_LOOP,
+	STMT_DO_WHILE_LOOP,
+	STMT_BREAK,
+	STMT_CONTINUE,
+	STMT_PUTCHAR
 } StmtType;
 
 typedef struct
@@ -98,7 +114,7 @@ typedef struct
 	Token name;
 	Expr* initializer; // Can be NULL
 	// Later also add thing like is struct maybe
-	DataType type;
+	DataType dataType;
 } StmtVariableDeclaration;
 
 typedef struct
@@ -107,3 +123,42 @@ typedef struct
 	Token location;
 	Expr* returnValue; // Can be NULL
 } StmtReturn;
+
+typedef struct
+{
+	Stmt stmt;
+	StmtArray satements;
+} StmtBlock;
+
+typedef struct
+{
+	Stmt stmt;
+	Expr* condition;
+	Stmt* thenBlock;
+	Stmt* elseBlock;
+} StmtIf;
+
+typedef struct
+{
+	Stmt stmt;
+	Expr* condition;
+	Stmt* body;
+} StmtWhileLoop;
+
+typedef struct
+{
+	Stmt stmt;
+	Token token;
+} StmtBreak;
+
+typedef struct
+{
+	Stmt stmt;
+	Token token;
+} StmtContinue;
+
+typedef struct
+{
+	Stmt stmt;
+	Expr* expresssion;
+} StmtPutchar;

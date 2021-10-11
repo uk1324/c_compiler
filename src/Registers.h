@@ -44,3 +44,5 @@ typedef enum
 
 const char* RegisterGpToString(RegisterGp reg, size_t registerSize);
 const char* RegisterSimdToString(RegisterSimd reg);
+
+const char* dataSizeToString(size_t size);

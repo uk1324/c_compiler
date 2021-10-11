@@ -164,9 +164,9 @@ static void skipWhitespace(Scanner* scanner)
 				break;
 
 			case '/':
-				advance(scanner);
-				if ((isAtEnd(scanner) == false) && (peek(scanner) == '/'))
+				if ((isAtEnd(scanner) == false) && (peekNext(scanner) == '/'))
 				{
+					advance(scanner);
 					advance(scanner);
 					while (isAtEnd(scanner) == false)
 					{
@@ -196,6 +196,10 @@ static void skipWhitespace(Scanner* scanner)
 
 						advance(scanner);
 					}
+				}
+				else
+				{
+					return;
 				}
 				break;
 
@@ -311,6 +315,7 @@ static Token number(Scanner* scanner)
 			// The long long literal letters have to have the same case ("LL" or "ll").
 			if (peek(scanner) == peekPrevious(scanner))
 			{
+				advance(scanner);
 				return isUnsigned
 					? makeToken(scanner, TOKEN_UNSIGNED_LONG_LONG_LITERAL)
 					: makeToken(scanner, TOKEN_LONG_LONG_LITERAL);
@@ -323,6 +328,23 @@ static Token number(Scanner* scanner)
 
 		return makeToken(scanner, TOKEN_INT_LITERAL);
 	}
+}
+
+static Token charLiteral(Scanner* scanner)
+{
+	while ((isAtEnd(scanner) == false) && (match(scanner, '\'') == false))
+	{
+		advance(scanner);
+	}
+
+	Token token =  makeToken(scanner, TOKEN_CHAR_LITERAL);
+	if (token.text.length == 2)
+	{
+		error(scanner, "empty character literal not allowed");
+		return errorToken();
+	}
+
+	return token;
 }
 
 static Token identifierOrKeyword(Scanner* scanner)
@@ -358,17 +380,39 @@ static Token identifierOrKeyword(Scanner* scanner)
 			KEYWORD("do", TOKEN_DO)
 		KEYWORD_GROUP_END()
 
+		KEYWORD_GROUP('p')
+			KEYWORD("putchar", TOKEN_PUTCHAR)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('e')
+			KEYWORD("else", TOKEN_ELSE)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('w')
+			KEYWORD("while", TOKEN_WHILE)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('f')
+			KEYWORD("float", TOKEN_FLOAT)
+			KEYWORD("for", TOKEN_FOR)
+		KEYWORD_GROUP_END()
+
 		KEYWORD_GROUP('i')
 			KEYWORD("if", TOKEN_IF)
 			KEYWORD("int", TOKEN_INT)
 		KEYWORD_GROUP_END()
 
-		KEYWORD_GROUP('f')
-			KEYWORD("float", TOKEN_FLOAT)
-		KEYWORD_GROUP_END()
-
 		KEYWORD_GROUP('l')
 			KEYWORD("long", TOKEN_LONG)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('c')
+			KEYWORD("char", TOKEN_CHAR)
+			KEYWORD("continue", TOKEN_CONTINUE)
+		KEYWORD_GROUP_END()
+
+		KEYWORD_GROUP('b')
+			KEYWORD("break", TOKEN_BREAK)
 		KEYWORD_GROUP_END()
 
 		KEYWORD_GROUP('s')
@@ -436,13 +480,26 @@ static Token scanToken(Scanner* scanner)
 		case '-': return makeToken(scanner, TOKEN_MINUS);
 		case '*': return makeToken(scanner, TOKEN_ASTERISK);
 		case '/': return makeToken(scanner, TOKEN_SLASH);
+		case '%': return makeToken(scanner, TOKEN_PERCENT);
 		case '(': return makeToken(scanner, TOKEN_LEFT_PAREN);
 		case ')': return makeToken(scanner, TOKEN_RIGHT_PAREN);
 		case ';': return makeToken(scanner, TOKEN_SEMICOLON);
-		case '=': return makeToken(scanner, TOKEN_EQUALS);
 		case '~': return makeToken(scanner, TOKEN_TILDE);
-		case '&': return makeToken(scanner, TOKEN_AMPERSAND);
 		case '^': return makeToken(scanner, TOKEN_CIRCUMFLEX);
+		case '{': return makeToken(scanner, TOKEN_LEFT_BRACE);
+		case '}': return makeToken(scanner, TOKEN_RIGHT_BRACE);
+		case '\'': return charLiteral(scanner);
+
+		case '&': return match(scanner, '&')
+			? makeToken(scanner, TOKEN_AMPERSAND_AMPERSAND)
+			: makeToken(scanner, TOKEN_AMPERSAND);
+		case '=': return match(scanner, '=')
+			? makeToken(scanner, TOKEN_EQUALS_EQUALS)
+			: makeToken(scanner, TOKEN_EQUALS);
+
+		case '!': return match(scanner, '=')
+			? makeToken(scanner, TOKEN_BANG_EQUALS)
+			: makeToken(scanner, TOKEN_BANG);
 
 		case '|': 
 		{

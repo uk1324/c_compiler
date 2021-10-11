@@ -41,7 +41,7 @@ bool DataTypeIsInt(const DataType* type);
 
 typedef struct
 {
-	DataType type;
+	DataType dataType;
 	// Real position is [rbp-baseOffset]
 	size_t baseOffset;
 } LocalVariable;

@@ -1,1 +1,16 @@
-return 3 - 1;
+{
+	int a = 5;
+	int b = 5;
+	//char value = a > b;
+	//putchar('0' + value);
+	//value = a >= b;
+	//putchar('0' + value);
+	//value = a < b;
+	//putchar('0' + value);
+	//value = a <= b;
+	//putchar('0' + value);
+	putchar('0' + a > b);
+	//putchar('0' + a < b);
+	//putchar('0' + a >= b);
+	//putchar('0' + (a < b));
+}

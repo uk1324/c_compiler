@@ -65,5 +65,6 @@ bool DataTypeIsInt(const DataType* type)
 	return (type->type == DATA_TYPE_CHAR)
 		|| (type->type == DATA_TYPE_SHORT)
 		|| (type->type == DATA_TYPE_INT)
-		|| (type->type == DATA_TYPE_LONG);
+		|| (type->type == DATA_TYPE_LONG)
+		|| (type->type == DATA_TYPE_LONG_LONG);
 }

@@ -10,6 +10,7 @@ static void error(Parser* parser, const char* message);
 static Token peek(Parser* parser);
 static bool check(Parser* parser, TokenType type);
 static bool match(Parser* parser, TokenType type);
+// Rename consume to expect
 static void consume(Parser* parser, TokenType type, const char* errorMessage);
 
 static Stmt* expressionStatement(Parser* parser);
@@ -59,7 +60,10 @@ static void errorAt(Parser* parser, Token* token, const char* message)
 	parser->hadError = true;
 	parser->isSynchronizing = true;
 
-	fprintf(stderr, "%s\n", message);
+	fprintf(
+		stderr, "%s:%d: " TERM_COL_RED "error: " TERM_COL_RESET "%s\n",
+		parser->scanner.fileInfo->filename, token->line, message
+	);
 }
 
 static void error(Parser* parser, const char* message)
@@ -142,15 +146,21 @@ static DataType dataType(Parser* parser)
 				return type;
 			}
 			type.type = DATA_TYPE_LONG_DOUBLE;
+			return type;
 		}
 
 		if (match(parser, TOKEN_LONG))
 		{
 			match(parser, TOKEN_INT);
 			type.type = DATA_TYPE_LONG_LONG;
+			return type;
 		}
 
 		type.type = DATA_TYPE_LONG;
+	}
+	else if (match(parser, TOKEN_CHAR))
+	{
+		type.type = DATA_TYPE_CHAR;
 	}
 	else if (match(parser, TOKEN_SHORT))
 	{
@@ -161,6 +171,7 @@ static DataType dataType(Parser* parser)
 	{
 		type.type = DATA_TYPE_INT;
 	}
+
 	else if (match(parser, TOKEN_DOUBLE))
 	{
 		if (isSignednessSpecified)
@@ -205,6 +216,10 @@ static DataType tokenNumberLiteralToDataType(TokenType token)
 		case TOKEN_UNSIGNED_INT_LITERAL:
 			type.isUnsigned = true;
 			type.type = DATA_TYPE_INT;
+			break;
+		case TOKEN_CHAR_LITERAL:
+			type.isUnsigned = false;
+			type.type = DATA_TYPE_CHAR;
 			break;
 		case TOKEN_LONG_LITERAL:
 			type.isUnsigned = false;
@@ -320,9 +335,91 @@ static Expr* factor(Parser* parser)
 	return (Expr*)expr;
 }
 
+static Expr* comparison(Parser* parser)
+{
+	Expr* expr = factor(parser);
+
+	while ((match(parser, TOKEN_LESS_THAN)) || (match(parser, TOKEN_LESS_THAN_EQUALS))
+		|| (match(parser, TOKEN_MORE_THAN)) || (match(parser, TOKEN_MORE_THAN_EQUALS)))
+	{
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous;
+		temp->right = factor(parser);
+		expr = (Expr*)temp;
+	}
+
+	return (Expr*)expr;
+}
+
+static Expr* equality(Parser* parser)
+{
+	Expr* expr = comparison(parser);
+
+	while ((match(parser, TOKEN_BANG_EQUALS)) || (match(parser, TOKEN_EQUALS_EQUALS)))
+	{
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous;
+		temp->right = comparison(parser);
+		expr = (Expr*)temp;
+	}
+
+	return (Expr*)expr;
+}
+
+static Expr* or(Parser* parser)
+{
+	Expr* expr = equality(parser);
+
+	while ((match(parser, TOKEN_PIPE_PIPE)))
+	{
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous;
+		temp->right = equality(parser);
+		expr = (Expr*)temp;
+	}
+
+	return (Expr*)expr;
+}
+
+static Expr* and(Parser* parser)
+{
+	Expr* expr = or(parser);
+
+	while (match(parser, TOKEN_AMPERSAND_AMPERSAND))
+	{
+		ExprBinary* temp = (ExprBinary*)ExprAllocate(sizeof(ExprBinary), EXPR_BINARY);
+		temp->left = expr;
+		temp->operator = parser->previous;
+		temp->right = or(parser);
+		expr = (Expr*)temp;
+	}
+
+	return (Expr*)expr;
+}
+
+static Expr* assignment(Parser* parser)
+{
+	Expr* expr = and(parser);
+		
+	if (match(parser, TOKEN_EQUALS))
+	{
+		ExprAssignment* temp = EXPR_ALLOCATE(ExprAssignment, EXPR_ASSIGNMENT);
+		temp->left = expr;
+		temp->operator = parser->previous;
+		// Shouldn't this be assignment ?
+		temp->right = and(parser);
+		expr = (Expr*)temp;
+	}
+
+	return expr;
+}
+
 static Expr* expression(Parser* parser)
 {
-	return factor(parser);
+	return assignment(parser);
 }
 
 static Stmt* expressionStatement(Parser* parser)
@@ -339,7 +436,7 @@ static Stmt* expressionStatement(Parser* parser)
 static Stmt* variableDeclaration(Parser* parser)
 {
 	StmtVariableDeclaration* variableDeclaration = (StmtVariableDeclaration*)StmtAllocate(sizeof(StmtVariableDeclaration), STMT_VARIABLE_DECLARATION);
-	variableDeclaration->type = dataType(parser);
+	variableDeclaration->dataType = dataType(parser);
 	consume(parser, TOKEN_IDENTIFIER, "Expected variable name");
 	variableDeclaration->name = parser->previous;
 	if (match(parser, TOKEN_EQUALS))
@@ -370,9 +467,123 @@ static Stmt* returnStatement(Parser* parser)
 	return (Stmt*)stmt;
 }
 
+static Stmt* block(Parser* parser)
+{
+	StmtBlock* stmt = STMT_ALLOCATE(StmtBlock, STMT_BLOCK);
+	StmtArrayInit(&stmt->satements);
+	while ((isAtEnd(parser) == false) && (check(parser, TOKEN_RIGHT_BRACE) == false))
+	{
+		StmtArrayAppend(&stmt->satements, statement(parser));
+	}
+	consume(parser, TOKEN_RIGHT_BRACE, "Expected '}'");
+
+	return (Stmt*)stmt;
+}
+
+static Stmt* ifStmt(Parser* parser)
+{
+	StmtIf* stmt = STMT_ALLOCATE(StmtIf, STMT_IF);
+	consume(parser, TOKEN_LEFT_PAREN, "exptected '('");
+	stmt->condition = expression(parser);
+	consume(parser, TOKEN_RIGHT_PAREN, "exptected ')'");
+	stmt->thenBlock = statement(parser);
+	if (match(parser, TOKEN_ELSE))
+	{
+		stmt->elseBlock = statement(parser);
+	}
+	else
+	{
+		stmt->elseBlock = NULL;
+	}
+	return (Stmt*)stmt;
+}
+
+static Stmt* whileStmt(Parser* parser)
+{
+	StmtWhileLoop* stmt = STMT_ALLOCATE(StmtWhileLoop, STMT_WHILE_LOOP);
+	consume(parser, TOKEN_LEFT_PAREN, "exptected '('");
+	stmt->condition = expression(parser);
+	consume(parser, TOKEN_RIGHT_PAREN, "exptected ')'");
+	stmt->body = statement(parser);
+	return (Stmt*)stmt;
+}
+
+static Stmt* forStmt(Parser* parser)
+{
+	StmtBlock* scope = STMT_ALLOCATE(StmtBlock, STMT_BLOCK);
+	StmtArrayInit(&scope->satements);
+
+	consume(parser, TOKEN_LEFT_PAREN, "exptected '('");
+
+	if (match(parser, TOKEN_SEMICOLON) == false)
+	{
+		StmtArrayAppend(&scope->satements, statement(parser));
+	}
+
+	StmtWhileLoop* loop = STMT_ALLOCATE(StmtWhileLoop, STMT_WHILE_LOOP);
+
+	if (match(parser, TOKEN_SEMICOLON))
+	{
+		ExprNumberLiteral* expr = EXPR_ALLOCATE(ExprNumberLiteral, EXPR_NUMBER_LITERAL);
+		expr->dataType.type = DATA_TYPE_INT;
+		expr->literal.line = parser->current.line;
+		expr->literal.type = TOKEN_INT_LITERAL;
+		expr->literal.text = StringViewInit("1", 1);
+		loop->condition = (Expr*)expr;
+	}
+	else
+	{
+		loop->condition = expression(parser);
+		consume(parser, TOKEN_SEMICOLON, "expected ';'");
+	}
+
+	Expr* iterationExpression = expression(parser);
+	StmtExpression* expression = STMT_ALLOCATE(StmtExpression, STMT_EXPRESSION);
+	expression->expresssion = iterationExpression;
+
+	consume(parser, TOKEN_RIGHT_PAREN, "exptected ')'");
+
+	StmtBlock* block = STMT_ALLOCATE(StmtBlock, STMT_BLOCK);
+	StmtArrayInit(&block->satements);
+	StmtArrayAppend(&block->satements, statement(parser));
+	StmtArrayAppend(&block->satements, (Stmt*)expression);
+	loop->body = (Stmt*)block;
+
+	StmtArrayAppend(&scope->satements, (Stmt*)loop);
+
+	return (Stmt*)scope;
+}
+
+static Stmt* breakStmt(Parser* parser)
+{
+	StmtBreak* stmt = STMT_ALLOCATE(StmtBreak, STMT_BREAK);
+	stmt->token = parser->previous;
+	consume(parser, TOKEN_SEMICOLON, "Expected ';'");
+	return (Stmt*)stmt;
+}
+
+static Stmt* continueStmt(Parser* parser)
+{
+	StmtContinue* stmt = STMT_ALLOCATE(StmtContinue, STMT_CONTINUE);
+	stmt->token = parser->previous;
+	consume(parser, TOKEN_SEMICOLON, "Expected ';'");
+	return (Stmt*)stmt;
+}
+
+static Stmt* putcharStmt(Parser* parser)
+{
+	StmtPutchar* stmt = STMT_ALLOCATE(StmtPutchar, STMT_PUTCHAR);
+	consume(parser, TOKEN_LEFT_PAREN, "Expected '('");
+	stmt->expresssion = expression(parser);
+	consume(parser, TOKEN_RIGHT_PAREN, "Expected ')'");
+	consume(parser, TOKEN_SEMICOLON, "Expected ';'");
+	return (Stmt*)stmt;
+}
+
 bool isDataTypeStart(Parser* parser)
 {
 	return check(parser, TOKEN_INT)
+		|| check(parser, TOKEN_CHAR)
 		|| check(parser, TOKEN_SHORT)
 		|| check(parser, TOKEN_LONG)
 		|| check(parser, TOKEN_SIGNED)
@@ -387,6 +598,20 @@ static Stmt* statement(Parser* parser)
 		return variableDeclaration(parser);
 	else if (match(parser, TOKEN_RETURN))
 		return returnStatement(parser);
+	else if (match(parser, TOKEN_LEFT_BRACE))
+		return block(parser);
+	else if (match(parser, TOKEN_IF))
+		return ifStmt(parser);
+	else if (match(parser, TOKEN_WHILE))
+		return whileStmt(parser);
+	else if (match(parser, TOKEN_FOR))
+		return forStmt(parser);
+	else if (match(parser, TOKEN_BREAK))
+		return breakStmt(parser);
+	else if (match(parser, TOKEN_CONTINUE))
+		return continueStmt(parser);
+	else if (match(parser, TOKEN_PUTCHAR))
+		return putcharStmt(parser);
 	else
 		return expressionStatement(parser);
 }

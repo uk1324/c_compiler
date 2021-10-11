@@ -1,4 +1,4 @@
-
+/*
 #include "Compiler.h"
 
 // Later add function for the parser, compiler and scanner to reset so they can compile multiple files.
@@ -29,10 +29,17 @@
 
 // Result location temp baseOffset and size
 
+// Could do basic dead code elimination by checking if an expression has side effect
+// and calling endScope on return
+
+// Make beginScope function take a Scope* so it remains on the stack
+
+// Install google test
+
 int main(int argCount, char* args[])
 {
-	/*while (true)
-	{*/
+
+	while (true)
 		const char* filename = "src/test.txt";
 
 		String source = StringFromFile(filename);
@@ -48,6 +55,9 @@ int main(int argCount, char* args[])
 			return EXIT_FAILURE;
 
 		String output = CompilerCompile(&compiler, &fileInfo, &ast);
+		if (compiler.hadError)
+			return EXIT_FAILURE;
+
 		printf("%s", output.chars);
 
 		StringFree(&source);
@@ -62,4 +72,4 @@ int main(int argCount, char* args[])
 
 	//}
 	return EXIT_SUCCESS;
-}
+}*/
