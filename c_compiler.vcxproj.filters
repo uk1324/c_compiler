@@ -15,102 +15,82 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main.c">
+    <ClCompile Include="src2\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Scanner.c">
+    <ClCompile Include="src2\Scanner.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\IntArray.c">
+    <ClCompile Include="src2\StringView.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Cli.c">
+    <ClCompile Include="src2\String.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\String.c">
+    <ClCompile Include="src2\FileInfo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Ast.c">
+    <ClCompile Include="src2\Token.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Parser.c">
+    <ClCompile Include="src2\TerminalColors.h">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\AstPrinter.c">
+    <ClCompile Include="src2\Compiler.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Compiler.c">
+    <ClCompile Include="src2\Result.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Variable.c">
+    <ClCompile Include="src2\DataType.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\StringView.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Registers.c">
+    <ClCompile Include="src2\Typedef.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Scanner.h">
+    <ClInclude Include="src2\Scanner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Assert.h">
+    <ClInclude Include="src2\Array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Array.h">
+    <ClInclude Include="src2\StringView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\IntArray.h">
+    <ClInclude Include="src2\String.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Cli.h">
+    <ClInclude Include="src2\Generic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\TerminalColors.h">
+    <ClInclude Include="src2\FileInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\String.h">
+    <ClInclude Include="src2\Assert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Ast.h">
+    <ClInclude Include="src2\Token.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Parser.h">
+    <ClInclude Include="src2\Compiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\AstPrinter.h">
+    <ClInclude Include="src2\Result.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Table.h">
+    <ClInclude Include="src2\DataType.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Compiler.h">
+    <ClInclude Include="src2\Typedef.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Alignment.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Variable.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Generic.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\StringView.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Registers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="src\notes.txt" />
-    <Text Include="src\test.txt" />
-    <Text Include="src\compiling_expressions.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="src2\test.txt" />
   </ItemGroup>
 </Project>
