@@ -22,10 +22,9 @@ System V ABI uses [rdi, rsi, rdx, rcx, r8, r9] for parameters
 xmm0 - xmm7 are used for floating point
 
 Ast function can have isLeaf that will be set during semnatic analysis
-Leaf function don't need to allocate on the stack the top of the stack for themselves
+Leaf functions don't need to allocate on the stack because they have the top of the stack for themselves.
 
-Stack has to be aligned to 128 bits on function call for simd instructions
-
+Stack has to be aligned to 128 bits on function call for simd instructions.
 
 Semantic analysis is mostly used for type cheking and could also be used for variable binding.
 This compiler doesn't need a semantic analizer because c requires a declaration to appear before
@@ -36,3 +35,14 @@ and can optimize it better for example using the floating point registers for th
 
 It is probably better to scan the whole file before starting parsing.
 This simplifies parsing of things like literal suffixes.
+
+There are no simd operations for the extended precision floating point so you have to use the x87 fpu.
+Microsoft compilers just use the double precision floating point for both double and long double.
+
+Microsoft also uses 4 bytes for both int and long, but long long has 8 bytes.
+On Unix long and long long have 8 bytes and int has bytes.
+
+https://www.ibm.com/docs/en/ibm-mq/9.0?topic=platforms-standard-data-types-unix-linux-windows
+
+movd and movq are used for moving intergers to sse registers. The values are zero extended.
+https://www.gamedev.net/blog/615/entry-2250281-demystifying-sse-move-instructions/

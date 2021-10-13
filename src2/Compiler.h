@@ -2,16 +2,46 @@
 
 #include "Token.h"
 #include "FileInfo.h"
-#include "DataType.h"
 #include "Result.h"
 
 #include <stdbool.h>
 #include <stdarg.h>
 
-//typedef int Result;
-//
-//#define RESULT_ERROR -1
-//#define RESULT_SUCCESS 1
+typedef struct
+{
+	StringView name;
+	DataType type;
+} Typedef;
+
+ARRAY_TEMPLATE_DECLARATION(TypedefArray, Typedef)
+
+#define ALIGN_DOWN_TO(alignment, num) \
+    (num - (num % alignment))
+
+#define ALIGN_UP_TO(alignment, num) \
+    (((num % alignment) == 0) ? num : (num + (alignment - (num % alignment))))
+
+
+#define CALL_STACK_ALIGNEMNT 16
+
+// The System V ABI specfies that the [rsp + 8] has to be aligned to 16 bytes at the time of call so SIMD mov instruction will work.
+// The call instruction pushes the rbp onto the stack so when the function starts executing the stack will be aligned to 16 bytes.
+#define ALIGN_STACK_FOR_CALL(num) \
+    ALIGN_UP_TO(CALL_STACK_ALIGNEMNT, num + 8)
+
+typedef struct
+{
+	StringView name;
+	Result location;
+} Variable;
+
+ARRAY_TEMPLATE_DECLARATION(VariableArray, Variable)
+
+typedef struct Scope
+{
+	struct Scope* enclosing;
+	VariableArray variables;
+} Scope;
 
 typedef struct
 {
@@ -21,8 +51,16 @@ typedef struct
 	size_t currentTokenIndex;
 
 	String textSection;
+	String dataSection;
 
-	//TypedefArray typedefTable;
+	Scope* currentScope;
+
+	TypedefArray typedefTable;
+
+	size_t stackFrameSize;
+
+	// Used to store data types for more complex types
+	DataTypeArray dataTypes;
 
 	bool hadError;
 	bool isSynchronizing;
@@ -31,6 +69,9 @@ typedef struct
 Compiler CompilerInit(Compiler* compiler);
 void CompilerFree(Compiler* compiler);
 String CompilerCompile(Compiler* compiler, const TokenArray* tokens, const FileInfo* fileInfo);
+
+void program(Compiler* compiler);
+bool checkDeclarationStart(Compiler* compiler);
 
 Result expr(Compiler* compiler);
 // Maybe put more newline between the different kinds of expression in the c file
@@ -115,6 +156,7 @@ Result commaExpr(Compiler* compiler);
 //void storageTypeSpecifier(Compiler* compiler);
 //void applyTypeSpecifier(Compiler* compiler, DataType* type);
 void declaration(Compiler* compiler);
+void declarator(Compiler* compiler, Result* result);
 //DataType declarationSpecifiers(Compiler* compiler);
 StorageClass storageClassSpecifier(Compiler* compiler);
 TypeQualifier typeQualifier(Compiler* compiler);
@@ -141,8 +183,18 @@ void compilerError(Compiler* compiler, const char* format, ...);
 void advanceCompiler(Compiler* compiler);
 Token peekToken(Compiler* compiler);
 Token peekNextToken(Compiler* compiler);
+Token peekPreviousToken(Compiler* compiler);
 bool expectToken(Compiler* compiler, TokenType type, const char* errorMessage);
 bool isCompilerAtEnd(Compiler* compiler);
 bool checkToken(Compiler* compiler, TokenType type);
 bool checkNextToken(Compiler* compiler, TokenType type);
 bool matchToken(Compiler* compiler, TokenType type);
+
+void declareTypedef(Compiler* compiler, StringView name, const DataType* dataType);
+// Returns if the typedef exists
+bool resolveTypedef(Compiler* compiler, StringView name, DataType* dataType);
+
+Result allocateVariableOnStack(Compiler* compiler, const DataType* dataType);
+
+Result declareVariable(Compiler* compiler, StringView name, const DataType* dataType);
+bool resolveVariable(Compiler* compiler, StringView name, Result* result);

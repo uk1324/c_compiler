@@ -1,8 +1,13 @@
 #pragma once
 
+#include "Array.h"
+
 #include <stdbool.h>
 
-//#define ERROR_DATA_TYPE DataType { DATA_TYPE_ERROR }
+#define SIZE_QWORD 8
+#define SIZE_DWORD 4
+#define SIZE_WORD 2
+#define SIZE_BYTE 1
 
 typedef enum
 {
@@ -48,7 +53,7 @@ typedef struct
 typedef struct
 {
 	const struct DataType* type;
-	size_t levelOfIndiretion;
+	int levelOfIndiretion;
 } Pointer;
 
 typedef struct
@@ -63,6 +68,9 @@ typedef struct
 	// Not used if type is complex
 	bool isUnsigned;
 
+	bool isConst;
+	bool isVolatile;
+
 	union
 	{
 		Struct strct;
@@ -72,3 +80,7 @@ typedef struct
 	} as;
 
 } DataType;
+
+size_t DataTypeSize(const DataType* dataType);
+
+ARRAY_TEMPLATE_DECLARATION(DataTypeArray, DataType)

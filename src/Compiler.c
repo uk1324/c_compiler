@@ -1,3 +1,4 @@
+#include "..\src2\Compiling.h"
 #include "Compiler.h"
 #include "Assert.h"
 #include "Alignment.h"

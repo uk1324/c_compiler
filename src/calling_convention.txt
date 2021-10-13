@@ -1,0 +1,5 @@
+rbp, rbx and r12-15 are caller saved registers
+rdi, rsi, rdx, rcx, r8, r9 are used for parameters passing
+x87 values are passed in memory
+
+https://raw.githubusercontent.com/wiki/hjl-tools/x86-psABI/x86-64-psABI-1.0.pdf page 26

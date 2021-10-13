@@ -1,4 +1,4 @@
-/*
+
 #include "Compiler.h"
 
 // Later add function for the parser, compiler and scanner to reset so they can compile multiple files.
@@ -34,42 +34,39 @@
 
 // Make beginScope function take a Scope* so it remains on the stack
 
-// Install google test
+// Add ast node error
 
 int main(int argCount, char* args[])
 {
+	const char* filename = "src/triangle.txt";
 
-	while (true)
-		const char* filename = "src/test.txt";
+	String source = StringFromFile(filename);
+	FileInfo fileInfo;
+	FileInfoInit(&fileInfo);
+	Parser parser;
+	ParserInit(&parser);
+	Compiler compiler;
+	CompilerInit(&compiler);
 
-		String source = StringFromFile(filename);
-		FileInfo fileInfo;
-		FileInfoInit(&fileInfo);
-		Parser parser;
-		ParserInit(&parser);
-		Compiler compiler;
-		CompilerInit(&compiler);
+	StmtArray ast = ParserParse(&parser, filename, StringViewFromString(&source), &fileInfo);
+	if (parser.hadError)
+		return EXIT_FAILURE;
 
-		StmtArray ast = ParserParse(&parser, filename, StringViewFromString(&source), &fileInfo);
-		if (parser.hadError)
-			return EXIT_FAILURE;
+	String output = CompilerCompile(&compiler, &fileInfo, &ast);
+	if (compiler.hadError)
+		return EXIT_FAILURE;
 
-		String output = CompilerCompile(&compiler, &fileInfo, &ast);
-		if (compiler.hadError)
-			return EXIT_FAILURE;
+	printf("%s", output.chars);
 
-		printf("%s", output.chars);
+	StringFree(&source);
+	ParserFree(&parser);
+	FileInfoFree(&fileInfo);
+	CompilerFree(&compiler);
+	for (size_t i = 0; i < ast.size; i++)
+	{
+		StmtFree(ast.data[i]);
+	}
+	StmtArrayFree(&ast);
 
-		StringFree(&source);
-		ParserFree(&parser);
-		FileInfoFree(&fileInfo);
-		CompilerFree(&compiler);
-		for (size_t i = 0; i < ast.size; i++)
-		{
-			StmtFree(ast.data[i]);
-		}
-		StmtArrayFree(&ast);
-
-	//}
 	return EXIT_SUCCESS;
-}*/
+}

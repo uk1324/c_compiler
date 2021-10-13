@@ -1,15 +1,16 @@
 #include "Compiler.h"
 #include "TerminalColors.h"
 #include "Assert.h"
+#include "Generic.h"
 
 Compiler CompilerInit(Compiler* compiler)
 {
-	
+	DataTypeArrayInit(&compiler->dataTypes);
 }
 
 void CompilerFree(Compiler* compiler)
 {
-
+	DataTypeArrayFree(&compiler->dataTypes);
 }
 
 String CompilerCompile(Compiler* compiler, const TokenArray* tokens, const FileInfo* fileInfo)
@@ -22,12 +23,66 @@ String CompilerCompile(Compiler* compiler, const TokenArray* tokens, const FileI
 	compiler->isSynchronizing = false;
 
 	compiler->textSection = StringCopy("");
+	compiler->dataSection = StringCopy("");
+
+	Scope scope;
+	//beginScope(compiler, &scope);
 
 	expr(compiler);
 	printf("%.*s", compiler->tokens->data[compiler->currentTokenIndex].text.length, compiler->tokens->data[compiler->currentTokenIndex].text.chars);
 	ASSERT(compiler->tokens->data[compiler->currentTokenIndex].type == TOKEN_EOF);
 
+	//endScope(compiler);
+
+	StringAppendLen(&compiler->textSection, compiler->dataSection.chars, compiler->dataSection.length);
 	return compiler->textSection;
+}
+
+void program(Compiler* compiler)
+{
+	while (matchToken(compiler, TOKEN_EOF) == false)
+	{
+		if (checkDeclarationStart(compiler))
+		{
+			declaration(compiler);
+		}
+		else
+		{
+			stmt(compiler);
+		}
+	}
+}
+
+bool checkDeclarationStart(Compiler* compiler)
+{
+	if (matchToken(compiler, TOKEN_IDENTIFIER))
+	{
+		DataType type;
+		//if (resolveTypedef(compiler, peekPreviousToken(compiler).text, &type))
+		{
+			return true;
+		}
+	}
+
+	return checkToken(compiler, TOKEN_CHAR)
+		|| checkToken(compiler, TOKEN_INT)
+		|| checkToken(compiler, TOKEN_SHORT)
+		|| checkToken(compiler, TOKEN_LONG)
+		|| checkToken(compiler, TOKEN_FLOAT)
+		|| checkToken(compiler, TOKEN_DOUBLE)
+		|| checkToken(compiler, TOKEN_VOID)
+		|| checkToken(compiler, TOKEN_UNSIGNED)
+		|| checkToken(compiler, TOKEN_SIGNED)
+		|| checkToken(compiler, TOKEN_AUTO)
+		|| checkToken(compiler, TOKEN_STATIC)
+		|| checkToken(compiler, TOKEN_EXTERN)
+		|| checkToken(compiler, TOKEN_REGISTER)
+		|| checkToken(compiler, TOKEN_TYPEDEF)
+		|| checkToken(compiler, TOKEN_STRUCT)
+		|| checkToken(compiler, TOKEN_ENUM)
+		|| checkToken(compiler, TOKEN_UNION)
+		|| checkToken(compiler, TOKEN_CONST)
+		|| checkToken(compiler, TOKEN_VOLATILE);
 }
 
 Result expr(Compiler* compiler)
@@ -655,7 +710,76 @@ void applyTypeSpecifier(Compiler* compiler, DataType* type)
 
 void declaration(Compiler* compiler)
 {
+	// Technically they can be in any order but I put them like that
+	Result result;
+	// also this doesn't allow multiple qualifiers
+	result.storageClass = storageClassSpecifier(compiler);
+	TypeQualifier qualifier = typeQualifier(compiler);
+	if (qualifier == TYPE_QUALIFIER_CONST)
+		result.dataType.isConst = true;
+	else if (qualifier == TYPE_QUALIFIER_VOLATILE)
+		result.dataType.isVolatile = true;
 
+	result.dataType = typeSpecifier(compiler);
+
+	declarator(compiler, &result);
+	//if (storageClass == STORAGE_CLASS_NONE)
+	//{
+	//	storageClass = STORAGE_CLASS_AUTO
+	//}
+}
+
+void declarator(Compiler* compiler, Result* result)
+{
+	DataType type = result->dataType;
+	// Doesn't handle function pointers and pointer qualifiers
+
+	if (matchToken(compiler, TOKEN_STAR))
+	{
+		int levelOfIndirection = 1;
+		while (matchToken(compiler, TOKEN_STAR))
+			levelOfIndirection++;
+
+		DataTypeArrayAppend(&compiler->dataTypes, type);
+		Pointer pointer;
+		pointer.type = &compiler->dataTypes.data[compiler->dataTypes.size - 1];
+		pointer.levelOfIndiretion = levelOfIndirection;
+		type.type = DATA_TYPE_POINTER;
+		type.as.ptr = pointer;
+	}
+
+	expectToken(compiler, TOKEN_IDENTIFIER, "exected variable name");
+	Token name = peekPreviousToken(compiler);
+
+	if (matchToken(compiler, TOKEN_LEFT_BRACKET))
+	{
+		Result result = expr(compiler);
+
+		expectToken(compiler, TOKEN_RIGHT_BRACKET, "expected ']'");
+
+		if (matchToken(compiler, TOKEN_EQUALS))
+		{
+			// Doesn't allow multi dimensional arrays
+			expectToken(compiler, TOKEN_LEFT_BRACE, "expected '{'");
+			do
+			{
+				if (checkToken(compiler, TOKEN_RIGHT_BRACE))
+					break;
+
+				assignmentExpr(compiler);
+
+			} while (matchToken(compiler, TOKEN_COMMA));
+
+			expectToken(compiler, TOKEN_RIGHT_BRACE, "expected '}'");
+		}
+	}
+	else
+	{
+		if (matchToken(compiler, TOKEN_EQUALS))
+		{
+			assignmentExpr(compiler);
+		}
+	}
 }
 
 Result declarationSpecifiers(Compiler* compiler)
@@ -932,6 +1056,8 @@ void compilerErrorAtVa(Compiler* compiler, Token token, const char* format, va_l
 	vfprintf(stderr, format, args);
 
 	fprintf(stderr, "\n");
+
+	exit(1);
 }
 
 void compilerErrorAt(Compiler* compiler, Token token, const char* format, ...)
@@ -969,6 +1095,11 @@ Token peekNextToken(Compiler* compiler)
 	return compiler->tokens->data[compiler->currentTokenIndex + 1];
 }
 
+Token peekPreviousToken(Compiler* compiler)
+{
+	return compiler->tokens->data[compiler->currentTokenIndex - 1];
+}
+
 bool expectToken(Compiler* compiler, TokenType type, const char* errorMessage)
 {
 	if (matchToken(compiler, type))
@@ -1001,3 +1132,92 @@ bool matchToken(Compiler* compiler, TokenType type)
 	}
 	return false;
 }
+
+Result allocateVariableOnStack(Compiler* compiler, const DataType* dataType)
+{
+	Result result;
+	// On x86 data in memory should be aligned to the size of the data.
+	// If memory is not aligned the cpu might need to perform 2 loads
+	// or with some instructions the program might crash.
+	size_t typeSize = DataTypeSize(dataType);
+	compiler->stackFrameSize = ALIGN_UP_TO(typeSize, compiler->stackFrameSize) + typeSize;
+	result.location.baseOffset = compiler->stackFrameSize;
+	result.locationType = RESULT_LOCATION_BASE_OFFSET;
+	return result;
+}
+
+Result declareVariable(Compiler* compiler, StringView name, const DataType* dataType)
+{
+	Result result;
+	if (resolveVariable(compiler, name, &result))
+	{
+		compilerError(compiler, "Variable already defined");
+	}
+	else
+	{
+		Variable variable;
+		variable.location = allocateVariableOnStack(compiler, DataTypeSize(dataType));
+		variable.name = name;
+		VariableArrayAppend(&compiler->currentScope->variables, variable);
+	}
+}
+
+bool resolveVariable(Compiler* compiler, StringView name, Result* result)
+{
+	for (size_t i = 0; i < compiler->currentScope->variables.size; i++)
+	{
+		if (StringViewEquals(&compiler->currentScope->variables.data[i].name, &name))
+		{
+			*result = compiler->currentScope->variables.data[i].location;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void copyVariable(Variable* dst, const Variable* src)
+{
+	*dst = *src;
+}
+
+ARRAY_TEMPLATE_DEFINITION(VariableArray, Variable, copyVariable, NO_OP_FUNCTION)
+
+void declareTypedef(Compiler* compiler, StringView name, const DataType* dataType)
+{
+	for (size_t i = 0; i < compiler->typedefTable.size; i++)
+	{
+		if (StringViewEquals(&compiler->typedefTable.data[i].name, &name))
+		{
+			compiler->typedefTable.data[i].name = name;
+			compiler->typedefTable.data[i].type = *dataType;
+			return;
+		}
+	}
+
+	Typedef typdef;
+	typdef.name = name;
+	typdef.type = *dataType;
+	TypedefArrayAppend(&compiler->typedefTable, typdef);
+}
+
+bool resolveTypedef(Compiler* compiler, StringView name, DataType* dataType)
+{
+	for (size_t i = 0; i < compiler->typedefTable.size; i++)
+	{
+		if (StringViewEquals(&compiler->typedefTable.data[i].name, &name))
+		{
+			*dataType = compiler->typedefTable.data[i].type;
+			return true;
+		}
+	}
+
+	dataType->type = DATA_TYPE_ERROR;
+	return false;
+}
+
+void copyTypedef(Typedef* dst, const Typedef* src)
+{
+	*dst = *src;
+}
+
+ARRAY_TEMPLATE_DEFINITION(TypedefArray, Typedef, copyTypedef, NO_OP_FUNCTION)

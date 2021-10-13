@@ -139,37 +139,47 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src2\Compiler.c" />
-    <ClCompile Include="src2\DataType.c" />
-    <ClCompile Include="src2\FileInfo.c" />
-    <ClCompile Include="src2\main.c" />
-    <ClCompile Include="src2\Result.c" />
-    <ClCompile Include="src2\Scanner.c" />
-    <ClCompile Include="src2\String.c" />
-    <ClCompile Include="src2\StringView.c" />
-    <ClCompile Include="src2\TerminalColors.h" />
-    <ClCompile Include="src2\Token.c" />
-    <ClCompile Include="src2\Typedef.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="src2\Array.h" />
-    <ClInclude Include="src2\Assert.h" />
-    <ClInclude Include="src2\Compiler.h" />
-    <ClInclude Include="src2\DataType.h" />
-    <ClInclude Include="src2\FileInfo.h" />
-    <ClInclude Include="src2\Generic.h" />
-    <ClInclude Include="src2\Result.h" />
-    <ClInclude Include="src2\Scanner.h" />
-    <ClInclude Include="src2\String.h" />
-    <ClInclude Include="src2\StringView.h" />
-    <ClInclude Include="src2\Token.h" />
-    <ClInclude Include="src2\Typedef.h" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include=".gitignore" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="src2\test.txt" />
+    <ClInclude Include="src\Alignment.h" />
+    <ClInclude Include="src\Array.h" />
+    <ClInclude Include="src\Assert.h" />
+    <ClInclude Include="src\Ast.h" />
+    <ClInclude Include="src\AstPrinter.h" />
+    <ClInclude Include="src\Cli.h" />
+    <ClInclude Include="src\Compiler.h" />
+    <ClInclude Include="src\Generic.h" />
+    <ClInclude Include="src\IntArray.h" />
+    <ClInclude Include="src\Parser.h" />
+    <ClInclude Include="src\Registers.h" />
+    <ClInclude Include="src\Scanner.h" />
+    <ClInclude Include="src\String.h" />
+    <ClInclude Include="src\StringView.h" />
+    <ClInclude Include="src\Table.h" />
+    <ClInclude Include="src\TerminalColors.h" />
+    <ClInclude Include="src\Variable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Ast.c" />
+    <ClCompile Include="src\AstPrinter.c" />
+    <ClCompile Include="src\Cli.c" />
+    <ClCompile Include="src\Compiler.c" />
+    <ClCompile Include="src\IntArray.c" />
+    <ClCompile Include="src\main.c" />
+    <ClCompile Include="src\Parser.c" />
+    <ClCompile Include="src\Registers.c" />
+    <ClCompile Include="src\Scanner.c" />
+    <ClCompile Include="src\String.c" />
+    <ClCompile Include="src\StringView.c" />
+    <ClCompile Include="src\Variable.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="src\calling_convention.txt" />
+    <Text Include="src\compiling_expressions.txt" />
+    <Text Include="src\notes.txt" />
+    <Text Include="src\primes.txt" />
+    <Text Include="src\triangle.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
